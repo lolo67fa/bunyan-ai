@@ -1,0 +1,64 @@
+# ===== Environment variables & secrets =====
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.ipynb_checkpoints/
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# ===== Node.js / React =====
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.npm/
+.eslintcache
+frontend/build/
+frontend/dist/
+.vite/
+
+# ===== Playwright =====
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+
+# ===== Generated output & temporary files =====
+# Applications and artifacts produced by agents at runtime
+generated/
+output/
+artifacts/
+tmp/
+temp/
+*.tmp
+*.log
+
+# ===== Editors & OS =====
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
