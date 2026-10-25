@@ -1,0 +1,478 @@
+{
+  "schema_version": "0.1.0-proposal",
+  "status": "ready_for_review",
+  "language": "en",
+  "source_idea": "Build an appointment booking app for a small dental clinic. The receptionist books appointments with the client's name, phone number, service type, date, time, duration and notes, and can reschedule or cancel them. Two appointments must not be booked at the same time. It would also be great to send SMS reminders to clients the day before.",
+  "app": {
+    "name": "Appointment Booking",
+    "description": "A web app for a small clinic receptionist to book, view, reschedule and cancel client appointments.",
+    "target_users": [
+      "Clinic receptionists",
+      "Small service businesses"
+    ]
+  },
+  "entities": [
+    {
+      "name": "Appointment",
+      "label": "Appointment",
+      "plural_label": "Appointments",
+      "description": "A booked time slot for a client.",
+      "display_field": "client_name",
+      "fields": [
+        {
+          "name": "client_name",
+          "label": "Client name",
+          "type": "string",
+          "required": true,
+          "unique": false,
+          "description": "",
+          "enum_values": null,
+          "reference_entity": null,
+          "default": null,
+          "validation": {
+            "min_length": 2,
+            "max_length": 100,
+            "min_value": null,
+            "max_value": null,
+            "pattern": null,
+            "date_constraint": null
+          }
+        },
+        {
+          "name": "client_phone",
+          "label": "Client phone",
+          "type": "phone",
+          "required": true,
+          "unique": false,
+          "description": "",
+          "enum_values": null,
+          "reference_entity": null,
+          "default": null,
+          "validation": {
+            "min_length": null,
+            "max_length": null,
+            "min_value": null,
+            "max_value": null,
+            "pattern": "^\\+?[0-9]{9,15}$",
+            "date_constraint": null
+          }
+        },
+        {
+          "name": "service",
+          "label": "Service",
+          "type": "enum",
+          "required": true,
+          "unique": false,
+          "description": "",
+          "enum_values": [
+            "consultation",
+            "follow_up",
+            "check_up"
+          ],
+          "reference_entity": null,
+          "default": null,
+          "validation": {
+            "min_length": null,
+            "max_length": null,
+            "min_value": null,
+            "max_value": null,
+            "pattern": null,
+            "date_constraint": null
+          }
+        },
+        {
+          "name": "date",
+          "label": "Date",
+          "type": "date",
+          "required": true,
+          "unique": false,
+          "description": "",
+          "enum_values": null,
+          "reference_entity": null,
+          "default": null,
+          "validation": {
+            "min_length": null,
+            "max_length": null,
+            "min_value": null,
+            "max_value": null,
+            "pattern": null,
+            "date_constraint": "not_in_past"
+          }
+        },
+        {
+          "name": "time",
+          "label": "Time",
+          "type": "time",
+          "required": true,
+          "unique": false,
+          "description": "",
+          "enum_values": null,
+          "reference_entity": null,
+          "default": null,
+          "validation": {
+            "min_length": null,
+            "max_length": null,
+            "min_value": null,
+            "max_value": null,
+            "pattern": null,
+            "date_constraint": null
+          }
+        },
+        {
+          "name": "duration_minutes",
+          "label": "Duration (minutes)",
+          "type": "integer",
+          "required": true,
+          "unique": false,
+          "description": "",
+          "enum_values": null,
+          "reference_entity": null,
+          "default": 30,
+          "validation": {
+            "min_length": null,
+            "max_length": null,
+            "min_value": 15.0,
+            "max_value": 240.0,
+            "pattern": null,
+            "date_constraint": null
+          }
+        },
+        {
+          "name": "status",
+          "label": "Status",
+          "type": "enum",
+          "required": true,
+          "unique": false,
+          "description": "",
+          "enum_values": [
+            "scheduled",
+            "completed",
+            "cancelled"
+          ],
+          "reference_entity": null,
+          "default": "scheduled",
+          "validation": {
+            "min_length": null,
+            "max_length": null,
+            "min_value": null,
+            "max_value": null,
+            "pattern": null,
+            "date_constraint": null
+          }
+        },
+        {
+          "name": "notes",
+          "label": "Notes",
+          "type": "text",
+          "required": false,
+          "unique": false,
+          "description": "",
+          "enum_values": null,
+          "reference_entity": null,
+          "default": null,
+          "validation": {
+            "min_length": null,
+            "max_length": 500,
+            "min_value": null,
+            "max_value": null,
+            "pattern": null,
+            "date_constraint": null
+          }
+        }
+      ],
+      "crud": {
+        "create": {
+          "enabled": true,
+          "details": ""
+        },
+        "read": {
+          "enabled": true,
+          "details": "",
+          "list_fields": [
+            "client_name",
+            "date",
+            "time",
+            "service",
+            "status"
+          ],
+          "search_fields": [
+            "client_name",
+            "client_phone"
+          ],
+          "filter_fields": [
+            "status",
+            "service",
+            "date"
+          ],
+          "sort_field": "date",
+          "sort_direction": "asc"
+        },
+        "update": {
+          "enabled": true,
+          "details": ""
+        },
+        "delete": {
+          "enabled": true,
+          "details": "",
+          "requires_confirmation": true
+        }
+      }
+    }
+  ],
+  "functional_requirements": [
+    {
+      "id": "FR-1",
+      "entity": "Appointment",
+      "category": "create",
+      "description": "The system shall allow the user to create a Appointment by entering: Client name, Client phone, Service, Date, Time, Duration (minutes), Status, Notes.",
+      "priority": "must"
+    },
+    {
+      "id": "FR-2",
+      "entity": "Appointment",
+      "category": "read",
+      "description": "The system shall display all Appointments in a list showing Client name, Date, Time, Service, Status, sorted by Date, with search by Client name, Client phone and filters by Status, Service, Date.",
+      "priority": "must"
+    },
+    {
+      "id": "FR-3",
+      "entity": "Appointment",
+      "category": "update",
+      "description": "The system shall allow the user to edit any field of an existing Appointment and save the changes.",
+      "priority": "must"
+    },
+    {
+      "id": "FR-4",
+      "entity": "Appointment",
+      "category": "delete",
+      "description": "The system shall allow the user to delete a Appointment after confirming the action in a confirmation dialog.",
+      "priority": "must"
+    },
+    {
+      "id": "FR-5",
+      "entity": "Appointment",
+      "category": "validation",
+      "description": "The system shall reject saving a Appointment unless: Client name is filled in, Client name has at least 2 characters, Client name has at most 100 characters, Client phone is filled in, Client phone matches the pattern ^\\+?[0-9]{9,15}$, Service is filled in, Date is filled in, Date is today or later, Time is filled in, Duration (minutes) is filled in, Duration (minutes) is at least 15, Duration (minutes) is at most 240, Status is filled in, Notes has at most 500 characters.",
+      "priority": "must"
+    },
+    {
+      "id": "FR-6",
+      "entity": "Appointment",
+      "category": "validation",
+      "description": "The system shall prevent saving an Appointment whose date and time are identical to another Appointment that is not cancelled.",
+      "priority": "must"
+    },
+    {
+      "id": "FR-7",
+      "entity": null,
+      "category": "persistence",
+      "description": "The system shall save all records in browser localStorage so they remain after the page is reloaded.",
+      "priority": "must"
+    }
+  ],
+  "user_stories": [
+    {
+      "id": "US-1",
+      "role": "receptionist",
+      "goal": "add a new Appointment",
+      "benefit": "I can keep a record of it",
+      "entity": "Appointment",
+      "operation": "create",
+      "requirement_ids": [
+        "FR-1",
+        "FR-5",
+        "FR-6",
+        "FR-7"
+      ]
+    },
+    {
+      "id": "US-2",
+      "role": "receptionist",
+      "goal": "view and search the list of Appointments",
+      "benefit": "I can find the record I need",
+      "entity": "Appointment",
+      "operation": "read",
+      "requirement_ids": [
+        "FR-2"
+      ]
+    },
+    {
+      "id": "US-3",
+      "role": "receptionist",
+      "goal": "edit an existing Appointment",
+      "benefit": "its information stays correct",
+      "entity": "Appointment",
+      "operation": "update",
+      "requirement_ids": [
+        "FR-3",
+        "FR-5"
+      ]
+    },
+    {
+      "id": "US-4",
+      "role": "receptionist",
+      "goal": "delete a Appointment I no longer need",
+      "benefit": "the list only contains relevant records",
+      "entity": "Appointment",
+      "operation": "delete",
+      "requirement_ids": [
+        "FR-4"
+      ]
+    }
+  ],
+  "acceptance_criteria": [
+    {
+      "id": "AC-1",
+      "story_id": "US-1",
+      "category": "create",
+      "given": "the Appointments list is open with N records",
+      "when": "the user fills in Client name = \"Sara Ahmed\", Client phone = \"0551234567\", Service = \"consultation\", Date = \"a date 3 days from today\", Time = \"10:30\", Duration (minutes) = \"30\", Status = \"scheduled\" and clicks \"Save\"",
+      "then": "a Appointment named \"Sara Ahmed\" appears in the list and the list shows N + 1 records"
+    },
+    {
+      "id": "AC-2",
+      "story_id": "US-1",
+      "category": "validation",
+      "given": "the create Appointment form is open",
+      "when": "the user leaves all fields empty and clicks \"Save\"",
+      "then": "no Appointment is saved and an error message is shown next to each required field: Client name, Client phone, Service, Date, Time, Duration (minutes), Status"
+    },
+    {
+      "id": "AC-3",
+      "story_id": "US-1",
+      "category": "validation",
+      "given": "the create Appointment form is open and all other fields are valid",
+      "when": "the user enters the 1-character value \"S\" in \"Client name\" and clicks \"Save\"",
+      "then": "the Appointment is not saved and an error message is shown next to \"Client name\""
+    },
+    {
+      "id": "AC-4",
+      "story_id": "US-1",
+      "category": "validation",
+      "given": "the create Appointment form is open and all other fields are valid",
+      "when": "the user enters the value \"abc123\" in \"Client phone\" and clicks \"Save\"",
+      "then": "the Appointment is not saved and an error message is shown next to \"Client phone\""
+    },
+    {
+      "id": "AC-5",
+      "story_id": "US-1",
+      "category": "validation",
+      "given": "the create Appointment form is open and all other fields are valid",
+      "when": "the user enters yesterday's date in \"Date\" and clicks \"Save\"",
+      "then": "the Appointment is not saved and an error message is shown next to \"Date\""
+    },
+    {
+      "id": "AC-6",
+      "story_id": "US-1",
+      "category": "validation",
+      "given": "the create Appointment form is open and all other fields are valid",
+      "when": "the user enters the value 300 in \"Duration (minutes)\" and clicks \"Save\"",
+      "then": "the Appointment is not saved and an error message is shown next to \"Duration (minutes)\""
+    },
+    {
+      "id": "AC-7",
+      "story_id": "US-1",
+      "category": "validation",
+      "given": "the create Appointment form is open and all other fields are valid",
+      "when": "the user enters a text of 501 characters in \"Notes\" and clicks \"Save\"",
+      "then": "the Appointment is not saved and an error message is shown next to \"Notes\""
+    },
+    {
+      "id": "AC-8",
+      "story_id": "US-1",
+      "category": "validation",
+      "given": "a scheduled Appointment exists on a date 3 days from today at 10:30",
+      "when": "the user saves a new Appointment for the same date at 10:30",
+      "then": "the new Appointment is not saved and the message \"This time slot is already booked\" is shown"
+    },
+    {
+      "id": "AC-9",
+      "story_id": "US-1",
+      "category": "persistence",
+      "given": "a Appointment named \"Sara Ahmed\" was created",
+      "when": "the user reloads the page",
+      "then": "\"Sara Ahmed\" is still shown in the Appointments list with the same values"
+    },
+    {
+      "id": "AC-10",
+      "story_id": "US-2",
+      "category": "read",
+      "given": "3 Appointments have been created",
+      "when": "the user opens the Appointments list",
+      "then": "exactly 3 rows are shown, each with the columns Client name, Date, Time, Service, Status"
+    },
+    {
+      "id": "AC-11",
+      "story_id": "US-2",
+      "category": "read",
+      "given": "no Appointments exist",
+      "when": "the user opens the Appointments list",
+      "then": "an empty-state message is shown instead of the list"
+    },
+    {
+      "id": "AC-12",
+      "story_id": "US-2",
+      "category": "read",
+      "given": "Appointments named \"Sara Ahmed\" and \"Other record\" exist",
+      "when": "the user types \"Sara Ahmed\" in the search box",
+      "then": "only the Appointment \"Sara Ahmed\" is shown in the list"
+    },
+    {
+      "id": "AC-13",
+      "story_id": "US-3",
+      "category": "update",
+      "given": "a Appointment named \"Sara Ahmed\" exists",
+      "when": "the user changes Client name to \"Sara Ahmed (edited)\", clicks \"Save\" and reloads the page",
+      "then": "the list shows \"Sara Ahmed (edited)\" and no longer shows \"Sara Ahmed\""
+    },
+    {
+      "id": "AC-14",
+      "story_id": "US-3",
+      "category": "validation",
+      "given": "a Appointment named \"Sara Ahmed\" exists",
+      "when": "the user clears Client name in the edit form and clicks \"Save\"",
+      "then": "the change is not saved, an error message is shown and the list still shows \"Sara Ahmed\""
+    },
+    {
+      "id": "AC-15",
+      "story_id": "US-4",
+      "category": "delete",
+      "given": "a Appointment named \"Sara Ahmed\" exists and the list shows N records",
+      "when": "the user clicks \"Delete\" on it and confirms",
+      "then": "\"Sara Ahmed\" is removed from the list, the list shows N - 1 records, and it is still absent after reloading the page"
+    },
+    {
+      "id": "AC-16",
+      "story_id": "US-4",
+      "category": "delete",
+      "given": "a Appointment named \"Sara Ahmed\" exists",
+      "when": "the user clicks \"Delete\" on it and cancels the confirmation",
+      "then": "\"Sara Ahmed\" is still shown in the list"
+    }
+  ],
+  "clarification_questions": [
+    {
+      "id": "Q-1",
+      "question": "Do you need to manage several staff members or rooms with separate schedules?",
+      "reason": "Multiple providers would add a Staff entity and change the double-booking rule.",
+      "blocking": false,
+      "options": [],
+      "suggested_default": "One provider only."
+    }
+  ],
+  "assumptions": [
+    "The app is used by one person in one browser; data is stored in localStorage.",
+    "Every record automatically gets id, created_at and updated_at system fields.",
+    "There is a single provider, so only one Appointment can occupy a date and time.",
+    "Working hours are not enforced in the MVP."
+  ],
+  "out_of_scope": [
+    {
+      "feature": "Messaging or third-party integration ('SMS')",
+      "category": "external_integration",
+      "reason": "Generated apps have no server and cannot send messages or call external services.",
+      "action": "replaced_with_crud_alternative",
+      "alternative": "Show reminders inside the app (e.g. highlight records due today)."
+    }
+  ]
+}

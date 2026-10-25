@@ -1,0 +1,377 @@
+{
+  "schema_version": "0.1.0-proposal",
+  "status": "ready_for_review",
+  "language": "en",
+  "source_idea": "I need a simple task manager for my studies. I want to add tasks with a title, an optional description, a due date, a priority (low, medium, high) and a status (to do, in progress, done). I should be able to see all my tasks, search them by title, filter by status, edit them and delete the ones I no longer need.",
+  "app": {
+    "name": "Task Manager",
+    "description": "A single-user web app to create, track, update and delete personal tasks with due dates, priority and status.",
+    "target_users": [
+      "Students",
+      "Individual professionals"
+    ]
+  },
+  "entities": [
+    {
+      "name": "Task",
+      "label": "Task",
+      "plural_label": "Tasks",
+      "description": "A piece of work the user needs to do.",
+      "display_field": "title",
+      "fields": [
+        {
+          "name": "title",
+          "label": "Title",
+          "type": "string",
+          "required": true,
+          "unique": false,
+          "description": "",
+          "enum_values": null,
+          "reference_entity": null,
+          "default": null,
+          "validation": {
+            "min_length": 3,
+            "max_length": 100,
+            "min_value": null,
+            "max_value": null,
+            "pattern": null,
+            "date_constraint": null
+          }
+        },
+        {
+          "name": "description",
+          "label": "Description",
+          "type": "text",
+          "required": false,
+          "unique": false,
+          "description": "",
+          "enum_values": null,
+          "reference_entity": null,
+          "default": null,
+          "validation": {
+            "min_length": null,
+            "max_length": 1000,
+            "min_value": null,
+            "max_value": null,
+            "pattern": null,
+            "date_constraint": null
+          }
+        },
+        {
+          "name": "due_date",
+          "label": "Due date",
+          "type": "date",
+          "required": false,
+          "unique": false,
+          "description": "",
+          "enum_values": null,
+          "reference_entity": null,
+          "default": null,
+          "validation": {
+            "min_length": null,
+            "max_length": null,
+            "min_value": null,
+            "max_value": null,
+            "pattern": null,
+            "date_constraint": "not_in_past"
+          }
+        },
+        {
+          "name": "priority",
+          "label": "Priority",
+          "type": "enum",
+          "required": true,
+          "unique": false,
+          "description": "",
+          "enum_values": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "reference_entity": null,
+          "default": "medium",
+          "validation": {
+            "min_length": null,
+            "max_length": null,
+            "min_value": null,
+            "max_value": null,
+            "pattern": null,
+            "date_constraint": null
+          }
+        },
+        {
+          "name": "status",
+          "label": "Status",
+          "type": "enum",
+          "required": true,
+          "unique": false,
+          "description": "",
+          "enum_values": [
+            "to_do",
+            "in_progress",
+            "done"
+          ],
+          "reference_entity": null,
+          "default": "to_do",
+          "validation": {
+            "min_length": null,
+            "max_length": null,
+            "min_value": null,
+            "max_value": null,
+            "pattern": null,
+            "date_constraint": null
+          }
+        }
+      ],
+      "crud": {
+        "create": {
+          "enabled": true,
+          "details": ""
+        },
+        "read": {
+          "enabled": true,
+          "details": "",
+          "list_fields": [
+            "title",
+            "due_date",
+            "priority",
+            "status"
+          ],
+          "search_fields": [
+            "title"
+          ],
+          "filter_fields": [
+            "status",
+            "priority"
+          ],
+          "sort_field": "due_date",
+          "sort_direction": "asc"
+        },
+        "update": {
+          "enabled": true,
+          "details": ""
+        },
+        "delete": {
+          "enabled": true,
+          "details": "",
+          "requires_confirmation": true
+        }
+      }
+    }
+  ],
+  "functional_requirements": [
+    {
+      "id": "FR-1",
+      "entity": "Task",
+      "category": "create",
+      "description": "The system shall allow the user to create a Task by entering: Title, Description, Due date, Priority, Status.",
+      "priority": "must"
+    },
+    {
+      "id": "FR-2",
+      "entity": "Task",
+      "category": "read",
+      "description": "The system shall display all Tasks in a list showing Title, Due date, Priority, Status, sorted by Due date, with search by Title and filters by Status, Priority.",
+      "priority": "must"
+    },
+    {
+      "id": "FR-3",
+      "entity": "Task",
+      "category": "update",
+      "description": "The system shall allow the user to edit any field of an existing Task and save the changes.",
+      "priority": "must"
+    },
+    {
+      "id": "FR-4",
+      "entity": "Task",
+      "category": "delete",
+      "description": "The system shall allow the user to delete a Task after confirming the action in a confirmation dialog.",
+      "priority": "must"
+    },
+    {
+      "id": "FR-5",
+      "entity": "Task",
+      "category": "validation",
+      "description": "The system shall reject saving a Task unless: Title is filled in, Title has at least 3 characters, Title has at most 100 characters, Description has at most 1000 characters, Due date is today or later, Priority is filled in, Status is filled in.",
+      "priority": "must"
+    },
+    {
+      "id": "FR-6",
+      "entity": null,
+      "category": "persistence",
+      "description": "The system shall save all records in browser localStorage so they remain after the page is reloaded.",
+      "priority": "must"
+    }
+  ],
+  "user_stories": [
+    {
+      "id": "US-1",
+      "role": "user",
+      "goal": "add a new Task",
+      "benefit": "I can keep a record of it",
+      "entity": "Task",
+      "operation": "create",
+      "requirement_ids": [
+        "FR-1",
+        "FR-5",
+        "FR-6"
+      ]
+    },
+    {
+      "id": "US-2",
+      "role": "user",
+      "goal": "view and search the list of Tasks",
+      "benefit": "I can find the record I need",
+      "entity": "Task",
+      "operation": "read",
+      "requirement_ids": [
+        "FR-2"
+      ]
+    },
+    {
+      "id": "US-3",
+      "role": "user",
+      "goal": "edit an existing Task",
+      "benefit": "its information stays correct",
+      "entity": "Task",
+      "operation": "update",
+      "requirement_ids": [
+        "FR-3",
+        "FR-5"
+      ]
+    },
+    {
+      "id": "US-4",
+      "role": "user",
+      "goal": "delete a Task I no longer need",
+      "benefit": "the list only contains relevant records",
+      "entity": "Task",
+      "operation": "delete",
+      "requirement_ids": [
+        "FR-4"
+      ]
+    }
+  ],
+  "acceptance_criteria": [
+    {
+      "id": "AC-1",
+      "story_id": "US-1",
+      "category": "create",
+      "given": "the Tasks list is open with N records",
+      "when": "the user fills in Title = \"Prepare sprint report\", Priority = \"high\", Status = \"to_do\" and clicks \"Save\"",
+      "then": "a Task named \"Prepare sprint report\" appears in the list and the list shows N + 1 records"
+    },
+    {
+      "id": "AC-2",
+      "story_id": "US-1",
+      "category": "validation",
+      "given": "the create Task form is open",
+      "when": "the user leaves all fields empty and clicks \"Save\"",
+      "then": "no Task is saved and an error message is shown next to each required field: Title, Priority, Status"
+    },
+    {
+      "id": "AC-3",
+      "story_id": "US-1",
+      "category": "validation",
+      "given": "the create Task form is open and all other fields are valid",
+      "when": "the user enters the 2-character value \"ab\" in \"Title\" and clicks \"Save\"",
+      "then": "the Task is not saved and an error message is shown next to \"Title\""
+    },
+    {
+      "id": "AC-4",
+      "story_id": "US-1",
+      "category": "validation",
+      "given": "the create Task form is open and all other fields are valid",
+      "when": "the user enters a text of 1001 characters in \"Description\" and clicks \"Save\"",
+      "then": "the Task is not saved and an error message is shown next to \"Description\""
+    },
+    {
+      "id": "AC-5",
+      "story_id": "US-1",
+      "category": "validation",
+      "given": "the create Task form is open and all other fields are valid",
+      "when": "the user enters yesterday's date in \"Due date\" and clicks \"Save\"",
+      "then": "the Task is not saved and an error message is shown next to \"Due date\""
+    },
+    {
+      "id": "AC-6",
+      "story_id": "US-1",
+      "category": "persistence",
+      "given": "a Task named \"Prepare sprint report\" was created",
+      "when": "the user reloads the page",
+      "then": "\"Prepare sprint report\" is still shown in the Tasks list with the same values"
+    },
+    {
+      "id": "AC-7",
+      "story_id": "US-2",
+      "category": "read",
+      "given": "3 Tasks have been created",
+      "when": "the user opens the Tasks list",
+      "then": "exactly 3 rows are shown, each with the columns Title, Due date, Priority, Status"
+    },
+    {
+      "id": "AC-8",
+      "story_id": "US-2",
+      "category": "read",
+      "given": "no Tasks exist",
+      "when": "the user opens the Tasks list",
+      "then": "an empty-state message is shown instead of the list"
+    },
+    {
+      "id": "AC-9",
+      "story_id": "US-2",
+      "category": "read",
+      "given": "Tasks named \"Prepare sprint report\" and \"Other record\" exist",
+      "when": "the user types \"Prepare sprint report\" in the search box",
+      "then": "only the Task \"Prepare sprint report\" is shown in the list"
+    },
+    {
+      "id": "AC-10",
+      "story_id": "US-3",
+      "category": "update",
+      "given": "a Task named \"Prepare sprint report\" exists",
+      "when": "the user changes Title to \"Prepare sprint report (edited)\", clicks \"Save\" and reloads the page",
+      "then": "the list shows \"Prepare sprint report (edited)\" and no longer shows \"Prepare sprint report\""
+    },
+    {
+      "id": "AC-11",
+      "story_id": "US-3",
+      "category": "validation",
+      "given": "a Task named \"Prepare sprint report\" exists",
+      "when": "the user clears Title in the edit form and clicks \"Save\"",
+      "then": "the change is not saved, an error message is shown and the list still shows \"Prepare sprint report\""
+    },
+    {
+      "id": "AC-12",
+      "story_id": "US-4",
+      "category": "delete",
+      "given": "a Task named \"Prepare sprint report\" exists and the list shows N records",
+      "when": "the user clicks \"Delete\" on it and confirms",
+      "then": "\"Prepare sprint report\" is removed from the list, the list shows N - 1 records, and it is still absent after reloading the page"
+    },
+    {
+      "id": "AC-13",
+      "story_id": "US-4",
+      "category": "delete",
+      "given": "a Task named \"Prepare sprint report\" exists",
+      "when": "the user clicks \"Delete\" on it and cancels the confirmation",
+      "then": "\"Prepare sprint report\" is still shown in the list"
+    }
+  ],
+  "clarification_questions": [
+    {
+      "id": "Q-1",
+      "question": "Do you want to group tasks into categories or projects?",
+      "reason": "Categories would add a second entity.",
+      "blocking": false,
+      "options": [],
+      "suggested_default": "No categories in the first version."
+    }
+  ],
+  "assumptions": [
+    "The app is used by one person in one browser; data is stored in localStorage.",
+    "Every record automatically gets id, created_at and updated_at system fields.",
+    "Tasks have no sub-tasks or assignees in the MVP."
+  ],
+  "out_of_scope": []
+}

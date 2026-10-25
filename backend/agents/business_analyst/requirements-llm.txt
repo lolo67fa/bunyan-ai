@@ -1,0 +1,6 @@
+# Business Analyst Agent: LLM mode (CrewAI). Includes everything in requirements.txt.
+# NOTE: CrewAI has a large dependency tree (~155 packages, several hundred MB) and can take
+# 20+ minutes to install on a slow connection. Mock mode and the tests do NOT need it.
+# Pinned version not yet verified end-to-end with a real model (see README "Known limitations").
+-r requirements.txt
+crewai==1.15.23
