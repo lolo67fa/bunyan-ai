@@ -11,6 +11,7 @@ Anthropic models only. Other providers use the CrewAI backend.
 
 from __future__ import annotations
 
+import inspect
 from typing import Any, Dict, Optional
 
 from .config import ConfigError, Settings
@@ -49,13 +50,30 @@ def build_request(description: str, settings: Settings) -> Dict[str, Any]:
     return request
 
 
+def adapt_to_sdk(request: Dict[str, Any], stream_fn: Any) -> Dict[str, Any]:
+    """Move fields the installed SDK has no keyword for into ``extra_body``.
+
+    CrewAI pins an older ``anthropic`` (0.7x) that lacks ``output_config`` and
+    ``fallbacks`` keywords; the API still accepts them in the request body.
+    """
+    params = inspect.signature(stream_fn).parameters
+    if any(p.kind is inspect.Parameter.VAR_KEYWORD for p in params.values()):
+        return request
+    request = dict(request)
+    extra = {k: request.pop(k) for k in ("output_config", "fallbacks") if k in request and k not in params}
+    if extra:
+        request["extra_body"] = {**request.get("extra_body", {}), **extra}
+    return request
+
+
 def run_direct(description: str, settings: Settings, client: Optional[Any] = None) -> str:
     """Call Claude once and return the text of the answer. ``client`` is injectable for tests."""
     if client is None:
         import anthropic
 
         client = anthropic.Anthropic()  # credentials from ANTHROPIC_API_KEY / ANTHROPIC_AUTH_TOKEN
-    with client.beta.messages.stream(**build_request(description, settings)) as stream:
+    stream_fn = client.beta.messages.stream
+    with stream_fn(**adapt_to_sdk(build_request(description, settings), stream_fn)) as stream:
         message = stream.get_final_message()
 
     if message.stop_reason == "refusal":

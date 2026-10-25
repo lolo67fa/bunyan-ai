@@ -118,9 +118,12 @@ These were produced in **mock mode** (templates), so they are structurally ident
 
 ## 5. Verification status (be precise when reporting)
 
+Checked 2026-10-26 on Python 3.10, CrewAI 1.15.23, anthropic 0.73.0 (venv) and 1.8.0 (system).
+
 | Check | Status |
 |---|---|
-| Contract, validation, scope guard, CLI, mock outputs | ✅ automated offline tests (`tests/`) |
-| LLM retry loop, prompt building, direct-backend request shape, refusal handling | ✅ tested with **fake** models only |
-| Real model call (direct backend) | ⏳ **not yet run.** Needs an API key. Run `evals/` or the command in the README |
-| CrewAI backend with a real model | ⏳ **not yet run** |
+| Contract, validation, scope guard, CLI, mock outputs (incl. the Gulf-dialect Arabic sample) | ✅ 130 offline tests pass in both environments |
+| LLM retry loop, prompt building, direct-backend request shape, refusal/truncation handling | ✅ tested with **fake** models only |
+| CrewAI import, Agent/Task/Crew construction from `crew.py` | ✅ verified (native `AnthropicCompletion` provider, no temperature sent) |
+| Both backends reach the Anthropic API from the CLI | ✅ verified with a deliberately invalid key: request accepted by the SDK and rejected by the server with HTTP 401, clean CLI error, exit code 1 |
+| **Authenticated real model call / quality of real output** | ⏳ **not yet run.** Needs an API key: follow README → LLM mode, then `BA_RUN_LLM_EVALS=1 pytest backend/agents/business_analyst/evals -v` |

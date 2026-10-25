@@ -59,8 +59,9 @@ python -m venv .venv
 # Mock mode and tests only (small, no API key needed):
 pip install -r backend/agents/business_analyst/requirements.txt
 
-# Add CrewAI for real LLM runs:
-pip install -r backend/agents/business_analyst/requirements-llm.txt
+# Add CrewAI for real LLM runs (large, ~150 packages; uv is much faster than pip on slow connections):
+pip install uv
+uv pip install --python .venv/Scripts/python.exe -r backend/agents/business_analyst/requirements-llm.txt
 ```
 
 ## Two modes
@@ -125,8 +126,8 @@ Use a key with a spending limit set in the Anthropic Console. To use a different
 
 | Backend | Needs | Use it for |
 |---|---|---|
-| `crewai` (default) | `pip install -r backend/agents/business_analyst/requirements-llm.txt` (large: ~155 packages) | The real integration path used by the orchestrator |
-| `direct` | only the `anthropic` package (`pip install anthropic`) | Validating the prompt, model and validation pipeline with a real model when CrewAI is not installed. Anthropic models only |
+| `crewai` (default) | `requirements-llm.txt` (CrewAI 1.15.23 + its Anthropic extra; ~150 packages, see Setup) | The real integration path used by the orchestrator |
+| `direct` | only the `anthropic` package (`pip install anthropic`; works with SDK 0.73 as pinned by CrewAI and with 1.x) | Validating the prompt, model and validation pipeline with a real model when CrewAI is not installed. Anthropic models only |
 
 Both send the same prompt and go through the same parsing, Pydantic validation, scope guard and retry loop. Only the code that calls the model differs.
 
@@ -204,7 +205,7 @@ pytest backend/agents/business_analyst/tests
 
 ## Known limitations
 
-- **LLM mode has not been run against a real model yet.** No API key was available during development. CrewAI also installs very slowly on the development machine (≈290 KB/s from PyPI; ~155 packages). Everything around the model call is tested with fake models; see [`contract/INTEGRATION.md`](contract/INTEGRATION.md) §5 for the exact verification status.
+- **LLM mode has not been run against a real model yet: no API key was available.** CrewAI 1.15.23 is installed and verified up to the network: both backends build a valid request that reaches Anthropic and is rejected only for the missing key (HTTP 401). Status per check: [`contract/INTEGRATION.md`](contract/INTEGRATION.md) §5.
 - Mock mode recognises only the three demo domains; it is for testing, not analysis.
 - The scope guard is keyword-based. It can miss unusual phrasings, and the LLM is the first line of defence. It is tuned to avoid flagging CRUD data such as a `payment_status` field or a library "checkout".
 - `feedback` (revision after user review) is only used in LLM mode.

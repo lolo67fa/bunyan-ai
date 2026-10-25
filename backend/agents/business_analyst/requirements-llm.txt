@@ -1,6 +1,7 @@
 # Business Analyst Agent: LLM mode (CrewAI). Includes everything in requirements.txt.
-# NOTE: CrewAI has a large dependency tree (~155 packages, several hundred MB) and can take
-# 20+ minutes to install on a slow connection. Mock mode and the tests do NOT need it.
-# Pinned version not yet verified end-to-end with a real model (see README "Known limitations").
+# The [anthropic] extra is required: CrewAI 1.x calls Anthropic through its native provider.
+# Large install (~150 packages). Verified 2026-10-26 on Python 3.10 with uv:
+#   uv pip install --python .venv/Scripts/python.exe -r backend/agents/business_analyst/requirements-llm.txt
+# (about 16 minutes on a ~290 KB/s connection; plain pip is much slower). Mock mode and tests do NOT need it.
 -r requirements.txt
-crewai==1.15.23
+crewai[anthropic]==1.15.23

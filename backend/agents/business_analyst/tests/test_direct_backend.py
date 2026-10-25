@@ -8,7 +8,7 @@ import pytest
 from backend.agents.business_analyst import analyze
 from backend.agents.business_analyst.analyst import AnalysisError
 from backend.agents.business_analyst.config import ConfigError, Settings, get_settings
-from backend.agents.business_analyst.direct_llm import build_request, run_direct
+from backend.agents.business_analyst.direct_llm import adapt_to_sdk, build_request, run_direct
 from backend.agents.business_analyst.mock_analyst import mock_generate
 
 IDEA = "أبغى موقع لإدارة المخزون أقدر أضيف فيه المنتجات وأعدل كمياتها وأسعارها وأحذفها."
@@ -124,3 +124,23 @@ def test_invalid_backend_or_effort(monkeypatch, var, value):
 def test_auth_token_satisfies_credential_check(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_AUTH_TOKEN", "dummy-token-for-test")
     _settings().check_llm_ready()
+
+
+def test_old_sdk_gets_new_fields_through_extra_body():
+    """CrewAI pins anthropic 0.7x, whose stream() has no output_config/fallbacks keywords."""
+    def old_stream(*, model, max_tokens, messages, system=None, betas=None, extra_body=None):
+        pass
+
+    request = adapt_to_sdk(build_request("prompt", _settings()), old_stream)
+    assert "output_config" not in request and "fallbacks" not in request
+    assert request["extra_body"] == {"output_config": {"effort": "high"}, "fallbacks": "default"}
+    assert request["betas"] == ["server-side-fallback-2026-07-01"]
+
+
+def test_new_sdk_keeps_native_keywords():
+    def new_stream(*, model, max_tokens, messages, system=None, betas=None, output_config=None,
+                   fallbacks=None, extra_body=None):
+        pass
+
+    request = adapt_to_sdk(build_request("prompt", _settings()), new_stream)
+    assert request["output_config"] == {"effort": "high"} and "extra_body" not in request
