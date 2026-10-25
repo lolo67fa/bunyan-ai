@@ -30,6 +30,10 @@ CASES = {
         "status": {"ready_for_review"}, "language": "ar",
         "entity_hint": "item|product", "out_of_scope": {"authentication"},
     },
+    "inventory_dialect_ar": {
+        "status": {"ready_for_review", "needs_clarification"}, "language": "ar",
+        "entity_hint": "item|product", "out_of_scope": set(),
+    },
     "appointment_booking_en": {
         "status": {"ready_for_review"}, "language": "en",
         "entity_hint": "appointment|booking", "out_of_scope": {"external_integration"},
@@ -55,7 +59,7 @@ def _write_report():
     OUTPUT_DIR.mkdir(exist_ok=True)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     settings = get_settings("llm")
-    report = {"model": settings.litellm_model, "temperature": settings.temperature, "runs": _results}
+    report = {"model": settings.litellm_model, "backend": settings.backend, "effort": settings.effort, "runs": _results}
     (OUTPUT_DIR / f"report-{stamp}.json").write_text(json.dumps(report, indent=2, ensure_ascii=False),
                                                      encoding="utf-8")
 

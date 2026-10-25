@@ -17,7 +17,7 @@ from backend.agents.business_analyst.language import detect_language
 from backend.agents.business_analyst.mock_analyst import mock_generate
 
 AGENT_DIR = Path(__file__).resolve().parents[1]
-SAMPLE_NAMES = ["task_manager_en", "inventory_manager_ar", "appointment_booking_en", "vague_idea_en", "out_of_scope_ar"]
+SAMPLE_NAMES = ["task_manager_en", "inventory_manager_ar", "inventory_dialect_ar", "appointment_booking_en", "vague_idea_en", "out_of_scope_ar"]
 
 LLM_SETTINGS = Settings(mode="llm", provider="anthropic", model="test-model",
                         temperature=0.0, max_retries=2, verbose=False)

@@ -88,13 +88,17 @@ def main(argv=None) -> int:
             request.feedback = args.feedback
         settings = get_settings(args.mode)
         print(f"Business Analyst Agent - mode: {settings.mode}"
-              + (f", model: {settings.litellm_model}" if settings.mode == "llm" else ""), file=sys.stderr)
+              + (f", backend: {settings.backend}, model: {settings.litellm_model}" if settings.mode == "llm" else ""),
+              file=sys.stderr)
         doc = analyze_input(request, settings=settings)
     except (ConfigError, ValidationError, OSError, json.JSONDecodeError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
     except AnalysisError as exc:
         print(f"ANALYSIS FAILED: {exc}", file=sys.stderr)
+        return 1
+    except Exception as exc:  # provider/network errors from the LLM SDK (bad key, rate limit, ...)
+        print(f"LLM CALL FAILED: {type(exc).__name__}: {exc}", file=sys.stderr)
         return 1
 
     output = doc.model_dump_json(indent=2)

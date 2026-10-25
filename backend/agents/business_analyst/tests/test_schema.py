@@ -17,6 +17,7 @@ from backend.agents.business_analyst.schema import (
 ALL_SAMPLES = [
     "task_manager_en",
     "inventory_manager_ar",
+    "inventory_dialect_ar",
     "appointment_booking_en",
     "vague_idea_en",
     "out_of_scope_ar",

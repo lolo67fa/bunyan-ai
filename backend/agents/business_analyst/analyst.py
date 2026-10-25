@@ -17,6 +17,7 @@ from typing import Callable, Dict, List, Optional
 from pydantic import ValidationError
 
 from .config import Settings, get_settings
+from .direct_llm import LLMRefusal
 from .language import detect_language
 from .mock_analyst import mock_generate
 from .prompts import build_task_description
@@ -97,6 +98,10 @@ def finalize(raw: str, idea: str, language: str, answers: Optional[Dict[str, str
 
 
 def _default_llm_generator(description: str, settings: Settings) -> str:
+    if settings.backend == "direct":
+        from .direct_llm import run_direct
+
+        return run_direct(description, settings)
     from .crew import run_crew
 
     return run_crew(description, settings)
@@ -134,7 +139,10 @@ def analyze(
         description = build_task_description(
             request.idea, language, request.answers, request.feedback, errors or None, raw
         )
-        raw = generator(description, settings)
+        try:
+            raw = generator(description, settings)
+        except LLMRefusal as exc:
+            raise AnalysisError("the model did not return a usable answer", [str(exc)], raw) from exc
         try:
             return finalize(raw, request.idea, language, request.answers)
         except OutputRejected as exc:

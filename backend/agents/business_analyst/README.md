@@ -23,10 +23,12 @@ business_analyst/
 ├── README.md                 ← this file
 ├── contract/
 │   ├── CONTRACT.md           ← input/output contract (for Naifah, Sara, Yara, Alanoud)
+│   ├── INTEGRATION.md        ← handoff guide for the Architect and the orchestrator
 │   └── requirements.schema.proposal.json   ← generated JSON Schema
 ├── schema.py                 ← Pydantic models = source of truth of the contract
 ├── analyst.py                ← pipeline: generate → parse → validate → scope guard (+ LLM retry loop)
-├── crew.py                   ← CrewAI agent / task / crew (LLM mode only)
+├── crew.py                   ← CrewAI agent / task / crew (LLM mode, crewai backend)
+├── direct_llm.py             ← Anthropic SDK call (LLM mode, direct backend)
 ├── prompts.py                ← role, goal, backstory, task prompt
 ├── mock_analyst.py           ← offline mock "LLM" (template-based, 3 demo domains)
 ├── scope.py                  ← deterministic CRUD-scope guard (English + Arabic)
@@ -35,7 +37,7 @@ business_analyst/
 ├── __main__.py               ← command line interface
 ├── regenerate_samples.py     ← rebuilds samples/outputs and the JSON Schema
 ├── samples/
-│   ├── inputs/               ← task manager, inventory (Arabic), appointment booking, vague, out-of-scope
+│   ├── inputs/               ← task manager, inventory (Arabic + Gulf dialect), appointment booking, vague, out-of-scope
 │   ├── answers/              ← example answers to clarification questions
 │   └── outputs/              ← requirements.json produced in mock mode ← give these to the Architect
 ├── tests/                    ← OFFLINE mock tests (free, always run)
@@ -102,25 +104,47 @@ Exit codes: `0` success · `1` analysis/validation failed · `2` configuration o
 
 ### LLM mode
 
-1. Copy the root `.env.example` to `.env` (git-ignored) and fill in:
+**1. Put your API key in the git-ignored `.env` file (never in code, chat, issues or commits).**
 
-   ```dotenv
-   LLM_PROVIDER=anthropic
-   LLM_MODEL=claude-sonnet-5-5
-   ANTHROPIC_API_KEY=your-key-here
-   ```
+```powershell
+# from the repository root
+Copy-Item .env.example .env        # .env is listed in .gitignore
+notepad .env                       # type the values below, save, close
+git check-ignore .env              # must print ".env" (confirms it will not be committed)
+```
 
-   To use a different model for this agent only, also set `BA_LLM_PROVIDER` / `BA_LLM_MODEL` (see [`.env.example`](.env.example)). Any provider supported by CrewAI/LiteLLM works (for example `openai` with `OPENAI_API_KEY`).
+```dotenv
+LLM_PROVIDER=anthropic
+LLM_MODEL=claude-opus-5-5
+ANTHROPIC_API_KEY=<your key from console.anthropic.com>
+```
 
-2. Run:
+Use a key with a spending limit set in the Anthropic Console. To use a different model for this agent only, set `BA_LLM_PROVIDER` / `BA_LLM_MODEL` (see [`.env.example`](.env.example)). With the CrewAI backend any LiteLLM provider works (for example `openai` with `OPENAI_API_KEY`).
 
-   ```bash
-   python -m backend.agents.business_analyst --mode llm \
-     --input backend/agents/business_analyst/samples/inputs/appointment_booking_en.json \
-     --out output/appointment.requirements.json
-   ```
+**2. Choose a backend** (`BA_LLM_BACKEND`):
+
+| Backend | Needs | Use it for |
+|---|---|---|
+| `crewai` (default) | `pip install -r backend/agents/business_analyst/requirements-llm.txt` (large: ~155 packages) | The real integration path used by the orchestrator |
+| `direct` | only the `anthropic` package (`pip install anthropic`) | Validating the prompt, model and validation pipeline with a real model when CrewAI is not installed. Anthropic models only |
+
+Both send the same prompt and go through the same parsing, Pydantic validation, scope guard and retry loop. Only the code that calls the model differs.
+
+**3. Run** (PowerShell; the `$env:` lines apply to the current terminal only):
+
+```powershell
+$env:BA_LLM_BACKEND = "direct"     # omit to use CrewAI
+python -m backend.agents.business_analyst --mode llm `
+  --input backend/agents/business_analyst/samples/inputs/inventory_dialect_ar.json `
+  --out output/inventory_dialect_ar.llm.requirements.json
+python -m backend.agents.business_analyst --validate output/inventory_dialect_ar.llm.requirements.json
+```
 
 If the model returns invalid JSON or breaks a rule (for example a vague acceptance criterion or a login requirement), the agent sends the exact validation errors back to the model and retries, `BA_MAX_RETRIES` times (default 2). It never returns an invalid document; it exits with code 1 instead.
+
+Notes:
+- `temperature` / `top_p` / `top_k` are **not sent** to Anthropic: the Messages API rejects them (API version `2026-10-21`). `BA_TEMPERATURE` is only forwarded to other providers.
+- The direct backend sets `output_config.effort` from `BA_EFFORT` (default `high`) and enables the server-side refusal fallback (`fallbacks: "default"`) on models that support it.
 
 ### From Python (for the orchestrator)
 
@@ -141,14 +165,14 @@ requirements_json = doc.model_dump_json(indent=2)
 
 | | Folder | Calls an LLM? | Run with |
 |---|---|---|---|
-| **Mock tests** | `tests/` | **Never.** Forces mock mode and hides API keys. | `pytest backend/agents/business_analyst/tests` |
+| **Mock tests** | `tests/` | **Never.** Forces mock mode, hides API keys, uses fake models. | `pytest backend/agents/business_analyst/tests` |
 | **LLM evaluations** | `evals/` | Yes, opt-in. Skipped unless `BA_RUN_LLM_EVALS=1` and a model + key are configured. | see below |
 
 ```bash
 # Offline mock tests: schema validity, missing information, CRUD scope, pipeline, CLI
 pytest backend/agents/business_analyst/tests
 
-# Live LLM evaluations (costs money: 5 samples, 1 to 3 model calls each)
+# Live LLM evaluations (costs money: 6 samples, 1 to 3 model calls each)
 # PowerShell:  $env:BA_RUN_LLM_EVALS="1"; pytest backend/agents/business_analyst/evals -v
 BA_RUN_LLM_EVALS=1 pytest backend/agents/business_analyst/evals -v
 ```
@@ -158,12 +182,15 @@ What the mock tests cover:
 - `test_schema.py`: all sample outputs validate; JSON round trip; 25 kinds of broken documents are rejected (bad IDs, dangling references, type/rule mismatches, missing CRUD coverage, vague criteria in English and Arabic, and more).
 - `test_missing_information.py`: vague ideas (English/Arabic) give `needs_clarification` with blocking questions; answers resolve them; a `ready_for_review` document cannot keep blocking questions.
 - `test_scope.py`: the guard detects 8 out-of-scope categories in English and Arabic without flagging plain CRUD ideas; mixed ideas keep the CRUD core; fully out-of-scope ideas are rejected; an LLM answer that sneaks a login or payment requirement in is rejected.
+- `test_direct_backend.py`: the direct Anthropic backend with a **fake client**: no sampling parameters sent, effort and fallback set, refusal / truncation handling, dialect input end to end.
+- `test_architect_handoff.py`: a reference consumer derives storage keys, form inputs, validation attributes, list/search/filter/sort and RTL from every ready sample, the way the Architect would.
 - `test_pipeline.py`: LLM mode with a **fake** model (retry with errors, give-up after max retries, code-fence tolerance), configuration and model overrides, CLI exit codes, and a check that committed samples and JSON Schema are up to date.
 
 The evals check behaviour (status, language, expected entity, flagged scope categories) rather than exact wording, and save every output plus a timing report to `evals/output/` (git-ignored).
 
 ## For the Software Architect Agent (Naifah)
 
+- **Start here:** [`contract/INTEGRATION.md`](contract/INTEGRATION.md) (interface, mapping to architecture, open decisions)
 - Contract: [`contract/CONTRACT.md`](contract/CONTRACT.md) · JSON Schema: [`contract/requirements.schema.proposal.json`](contract/requirements.schema.proposal.json)
 - Ready-to-use inputs: [`samples/outputs/task_manager_en.requirements.json`](samples/outputs/task_manager_en.requirements.json), [`inventory_manager_ar.requirements.json`](samples/outputs/inventory_manager_ar.requirements.json) (Arabic, two entities with a `reference` field), [`appointment_booking_en.requirements.json`](samples/outputs/appointment_booking_en.requirements.json)
 - Validate in Python: `RequirementsDocument.model_validate_json(text)`. Only run when `status == "ready_for_review"` **and** the user has approved.
@@ -177,7 +204,7 @@ pytest backend/agents/business_analyst/tests
 
 ## Known limitations
 
-- **LLM mode has not been run against a real model yet.** CrewAI could not be installed on the development machine within a reasonable time (≈290 KB/s from PyPI; CrewAI pulls ~155 packages). The LLM *pipeline* (prompt building, retry with validation errors, JSON parsing, config) is covered by tests that use a fake model. The CrewAI wiring in `crew.py` and the live evals in `evals/` still need a first real run: `pip install -r backend/agents/business_analyst/requirements-llm.txt`, configure `.env`, then `BA_RUN_LLM_EVALS=1 pytest backend/agents/business_analyst/evals -v`.
+- **LLM mode has not been run against a real model yet.** No API key was available during development. CrewAI also installs very slowly on the development machine (≈290 KB/s from PyPI; ~155 packages). Everything around the model call is tested with fake models; see [`contract/INTEGRATION.md`](contract/INTEGRATION.md) §5 for the exact verification status.
 - Mock mode recognises only the three demo domains; it is for testing, not analysis.
 - The scope guard is keyword-based. It can miss unusual phrasings, and the LLM is the first line of defence. It is tuned to avoid flagging CRUD data such as a `payment_status` field or a library "checkout".
 - `feedback` (revision after user review) is only used in LLM mode.

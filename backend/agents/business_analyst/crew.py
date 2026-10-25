@@ -21,7 +21,12 @@ os.environ.setdefault("OTEL_SDK_DISABLED", "true")
 def build_agent(settings: Settings):
     from crewai import LLM, Agent
 
-    llm = LLM(model=settings.litellm_model, temperature=settings.temperature)
+    kwargs = {}
+    # The Anthropic Messages API rejects temperature/top_p/top_k (API version 2026-10-21),
+    # so it is only forwarded to other providers, and only when BA_TEMPERATURE is set.
+    if settings.temperature is not None and settings.provider != "anthropic":
+        kwargs["temperature"] = settings.temperature
+    llm = LLM(model=settings.litellm_model, **kwargs)
     return Agent(
         role=ROLE,
         goal=GOAL,
