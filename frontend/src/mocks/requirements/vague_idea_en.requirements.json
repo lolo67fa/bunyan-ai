@@ -1,0 +1,51 @@
+{
+  "schema_version": "0.1.0-proposal",
+  "status": "needs_clarification",
+  "language": "en",
+  "source_idea": "I want an app to organise my stuff.",
+  "app": {
+    "name": "Untitled CRUD app",
+    "description": "Application idea that still needs clarification: I want an app to organise my stuff.",
+    "target_users": []
+  },
+  "entities": [],
+  "functional_requirements": [],
+  "user_stories": [],
+  "acceptance_criteria": [],
+  "clarification_questions": [
+    {
+      "id": "Q-1",
+      "question": "What kind of records do you want to manage (for example tasks, products, appointments, customers)?",
+      "reason": "The main entity of the app cannot be identified from the idea.",
+      "blocking": true,
+      "options": [
+        "Tasks",
+        "Products / inventory",
+        "Appointments",
+        "Something else"
+      ],
+      "suggested_default": null
+    },
+    {
+      "id": "Q-2",
+      "question": "What information should be stored for each record (for example name, date, quantity, status)?",
+      "reason": "Fields and their types are needed to build forms and validation.",
+      "blocking": true,
+      "options": [],
+      "suggested_default": null
+    },
+    {
+      "id": "Q-3",
+      "question": "Who will use the app?",
+      "reason": "Helps write user stories for the right role.",
+      "blocking": false,
+      "options": [],
+      "suggested_default": "A single person managing their own data."
+    }
+  ],
+  "assumptions": [
+    "The app is used by one person in one browser; data is stored in localStorage.",
+    "Every record automatically gets id, created_at and updated_at system fields."
+  ],
+  "out_of_scope": []
+}
