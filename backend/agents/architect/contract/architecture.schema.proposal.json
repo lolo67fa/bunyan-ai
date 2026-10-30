@@ -1,0 +1,954 @@
+{
+  "$defs": {
+    "AppInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "description": {
+          "default": "",
+          "title": "Description",
+          "type": "string"
+        },
+        "language": {
+          "enum": [
+            "ar",
+            "en"
+          ],
+          "title": "Language",
+          "type": "string"
+        },
+        "direction": {
+          "enum": [
+            "rtl",
+            "ltr"
+          ],
+          "title": "Direction",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "language",
+        "direction"
+      ],
+      "title": "AppInfo",
+      "type": "object"
+    },
+    "Behaviors": {
+      "additionalProperties": false,
+      "properties": {
+        "validate_before_save": {
+          "const": true,
+          "default": true,
+          "title": "Validate Before Save",
+          "type": "boolean"
+        },
+        "check_unique_before_save": {
+          "title": "Check Unique Before Save",
+          "type": "boolean"
+        },
+        "prefill_form_on_edit": {
+          "const": true,
+          "default": true,
+          "title": "Prefill Form On Edit",
+          "type": "boolean"
+        },
+        "load_on_start": {
+          "const": true,
+          "default": true,
+          "title": "Load On Start",
+          "type": "boolean"
+        },
+        "delete_confirmation": {
+          "enum": [
+            "inline",
+            "none"
+          ],
+          "title": "Delete Confirmation",
+          "type": "string"
+        },
+        "after_save": {
+          "const": "show_message_and_return_to_list",
+          "default": "show_message_and_return_to_list",
+          "title": "After Save",
+          "type": "string"
+        },
+        "after_delete": {
+          "const": "remove_row_and_show_message",
+          "default": "remove_row_and_show_message",
+          "title": "After Delete",
+          "type": "string"
+        }
+      },
+      "required": [
+        "check_unique_before_save",
+        "delete_confirmation"
+      ],
+      "title": "Behaviors",
+      "type": "object"
+    },
+    "Button": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "enum": [
+            "add_button",
+            "save_button",
+            "cancel_button"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "label": {
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "label"
+      ],
+      "title": "Button",
+      "type": "object"
+    },
+    "DeferredRule": {
+      "additionalProperties": false,
+      "description": "A requirement the MVP template cannot express. The PM agent records it as a risk.",
+      "properties": {
+        "requirement_id": {
+          "pattern": "^FR-\\d+$",
+          "title": "Requirement Id",
+          "type": "string"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        }
+      },
+      "required": [
+        "requirement_id",
+        "description"
+      ],
+      "title": "DeferredRule",
+      "type": "object"
+    },
+    "EmptyState": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "empty_state",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "EmptyState",
+      "type": "object"
+    },
+    "EntitySpec": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "description": "Copied from requirements entities[].name.",
+          "pattern": "^[A-Z][A-Za-z0-9]*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "label": {
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        },
+        "plural_label": {
+          "minLength": 1,
+          "title": "Plural Label",
+          "type": "string"
+        },
+        "display_field": {
+          "title": "Display Field",
+          "type": "string"
+        },
+        "storage": {
+          "$ref": "#/$defs/Storage"
+        },
+        "fields": {
+          "items": {
+            "$ref": "#/$defs/FieldSpec"
+          },
+          "maxItems": 12,
+          "minItems": 1,
+          "title": "Fields",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "label",
+        "plural_label",
+        "display_field",
+        "storage",
+        "fields"
+      ],
+      "title": "EntitySpec",
+      "type": "object"
+    },
+    "FieldSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "label": {
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "string",
+            "text",
+            "integer",
+            "decimal",
+            "boolean",
+            "date",
+            "time",
+            "datetime",
+            "email",
+            "phone",
+            "url",
+            "enum"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "input": {
+          "enum": [
+            "text",
+            "textarea",
+            "number",
+            "checkbox",
+            "date",
+            "time",
+            "datetime-local",
+            "email",
+            "tel",
+            "url",
+            "select"
+          ],
+          "title": "Input",
+          "type": "string"
+        },
+        "required": {
+          "title": "Required",
+          "type": "boolean"
+        },
+        "unique": {
+          "default": false,
+          "title": "Unique",
+          "type": "boolean"
+        },
+        "default": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Default"
+        },
+        "options": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/Option"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Options"
+        },
+        "step": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Number inputs only: 1 for integer, 0.01 for decimal.",
+          "title": "Step"
+        },
+        "validation": {
+          "$ref": "#/$defs/ValidationRules"
+        },
+        "show_in_list": {
+          "title": "Show In List",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name",
+        "label",
+        "type",
+        "input",
+        "required",
+        "show_in_list"
+      ],
+      "title": "FieldSpec",
+      "type": "object"
+    },
+    "Filters": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "filters",
+          "title": "Type",
+          "type": "string"
+        },
+        "fields": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Fields",
+          "type": "array"
+        }
+      },
+      "required": [
+        "type",
+        "fields"
+      ],
+      "title": "Filters",
+      "type": "object"
+    },
+    "FormFields": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "form_fields",
+          "title": "Type",
+          "type": "string"
+        },
+        "fields": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Fields",
+          "type": "array"
+        }
+      },
+      "required": [
+        "type",
+        "fields"
+      ],
+      "title": "FormFields",
+      "type": "object"
+    },
+    "Header": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "header",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "Header",
+      "type": "object"
+    },
+    "Messages": {
+      "additionalProperties": false,
+      "description": "User-facing text. ``{display}`` is replaced at runtime by the record's display_field value.",
+      "properties": {
+        "empty": {
+          "title": "Empty",
+          "type": "string"
+        },
+        "required": {
+          "title": "Required",
+          "type": "string"
+        },
+        "invalid": {
+          "title": "Invalid",
+          "type": "string"
+        },
+        "unique": {
+          "title": "Unique",
+          "type": "string"
+        },
+        "created": {
+          "title": "Created",
+          "type": "string"
+        },
+        "updated": {
+          "title": "Updated",
+          "type": "string"
+        },
+        "deleted": {
+          "title": "Deleted",
+          "type": "string"
+        },
+        "confirm_delete": {
+          "title": "Confirm Delete",
+          "type": "string"
+        },
+        "confirm_button": {
+          "title": "Confirm Button",
+          "type": "string"
+        },
+        "cancel_delete_button": {
+          "title": "Cancel Delete Button",
+          "type": "string"
+        },
+        "edit_button": {
+          "title": "Edit Button",
+          "type": "string"
+        },
+        "delete_button": {
+          "title": "Delete Button",
+          "type": "string"
+        }
+      },
+      "required": [
+        "empty",
+        "required",
+        "invalid",
+        "unique",
+        "created",
+        "updated",
+        "deleted",
+        "confirm_delete",
+        "confirm_button",
+        "cancel_delete_button",
+        "edit_button",
+        "delete_button"
+      ],
+      "title": "Messages",
+      "type": "object"
+    },
+    "Navigation": {
+      "additionalProperties": false,
+      "properties": {
+        "initial_screen": {
+          "const": "list",
+          "default": "list",
+          "title": "Initial Screen",
+          "type": "string"
+        },
+        "transitions": {
+          "items": {
+            "$ref": "#/$defs/Transition"
+          },
+          "title": "Transitions",
+          "type": "array"
+        }
+      },
+      "required": [
+        "transitions"
+      ],
+      "title": "Navigation",
+      "type": "object"
+    },
+    "Option": {
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "description": "Stored value, copied from requirements enum_values.",
+          "minLength": 1,
+          "title": "Value",
+          "type": "string"
+        },
+        "label": {
+          "description": "Text shown in the select, in the app language.",
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value",
+        "label"
+      ],
+      "title": "Option",
+      "type": "object"
+    },
+    "Screen": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "enum": [
+            "list",
+            "form"
+          ],
+          "title": "Id",
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "list",
+            "form"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "title": {
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "modes": {
+          "anyOf": [
+            {
+              "items": {
+                "enum": [
+                  "create",
+                  "edit"
+                ],
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Modes"
+        },
+        "components": {
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/Header"
+              },
+              {
+                "$ref": "#/$defs/EmptyState"
+              },
+              {
+                "$ref": "#/$defs/Button"
+              },
+              {
+                "$ref": "#/$defs/Search"
+              },
+              {
+                "$ref": "#/$defs/Filters"
+              },
+              {
+                "$ref": "#/$defs/Table"
+              },
+              {
+                "$ref": "#/$defs/FormFields"
+              }
+            ]
+          },
+          "minItems": 1,
+          "title": "Components",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "title",
+        "components"
+      ],
+      "title": "Screen",
+      "type": "object"
+    },
+    "Search": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "search",
+          "title": "Type",
+          "type": "string"
+        },
+        "fields": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Fields",
+          "type": "array"
+        },
+        "placeholder": {
+          "minLength": 1,
+          "title": "Placeholder",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "fields",
+        "placeholder"
+      ],
+      "title": "Search",
+      "type": "object"
+    },
+    "Sort": {
+      "additionalProperties": false,
+      "properties": {
+        "field": {
+          "title": "Field",
+          "type": "string"
+        },
+        "direction": {
+          "default": "asc",
+          "enum": [
+            "asc",
+            "desc"
+          ],
+          "title": "Direction",
+          "type": "string"
+        }
+      },
+      "required": [
+        "field"
+      ],
+      "title": "Sort",
+      "type": "object"
+    },
+    "Source": {
+      "additionalProperties": false,
+      "properties": {
+        "requirements_schema_version": {
+          "const": "0.1.0-proposal",
+          "default": "0.1.0-proposal",
+          "title": "Requirements Schema Version",
+          "type": "string"
+        }
+      },
+      "title": "Source",
+      "type": "object"
+    },
+    "Storage": {
+      "additionalProperties": false,
+      "properties": {
+        "engine": {
+          "const": "localStorage",
+          "default": "localStorage",
+          "title": "Engine",
+          "type": "string"
+        },
+        "key": {
+          "description": "One key holding a JSON array of records.",
+          "pattern": "^bunyan_[a-z][a-z0-9_]*$",
+          "title": "Key",
+          "type": "string"
+        },
+        "id_field": {
+          "const": "id",
+          "default": "id",
+          "title": "Id Field",
+          "type": "string"
+        },
+        "id_strategy": {
+          "const": "uuid",
+          "default": "uuid",
+          "title": "Id Strategy",
+          "type": "string"
+        },
+        "system_fields": {
+          "description": "Added by the generated app to every record; never shown in the form.",
+          "items": {
+            "enum": [
+              "id",
+              "created_at",
+              "updated_at"
+            ],
+            "type": "string"
+          },
+          "title": "System Fields",
+          "type": "array"
+        }
+      },
+      "required": [
+        "key"
+      ],
+      "title": "Storage",
+      "type": "object"
+    },
+    "Table": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "table",
+          "title": "Type",
+          "type": "string"
+        },
+        "columns": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Columns",
+          "type": "array"
+        },
+        "sort": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Sort"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "row_actions": {
+          "items": {
+            "enum": [
+              "edit",
+              "delete"
+            ],
+            "type": "string"
+          },
+          "title": "Row Actions",
+          "type": "array"
+        }
+      },
+      "required": [
+        "type",
+        "columns"
+      ],
+      "title": "Table",
+      "type": "object"
+    },
+    "Transition": {
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "enum": [
+            "list",
+            "form"
+          ],
+          "title": "From",
+          "type": "string"
+        },
+        "event": {
+          "enum": [
+            "add",
+            "edit",
+            "save_success",
+            "cancel"
+          ],
+          "title": "Event",
+          "type": "string"
+        },
+        "to": {
+          "enum": [
+            "list",
+            "form"
+          ],
+          "title": "To",
+          "type": "string"
+        },
+        "mode": {
+          "anyOf": [
+            {
+              "enum": [
+                "create",
+                "edit"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Mode"
+        }
+      },
+      "required": [
+        "from",
+        "event",
+        "to"
+      ],
+      "title": "Transition",
+      "type": "object"
+    },
+    "ValidationRules": {
+      "additionalProperties": false,
+      "description": "Same names and meaning as requirements.json ``fields[].validation``.",
+      "properties": {
+        "min_length": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Min Length"
+        },
+        "max_length": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Length"
+        },
+        "min_value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Min Value"
+        },
+        "max_value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Value"
+        },
+        "pattern": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pattern"
+        },
+        "date_constraint": {
+          "anyOf": [
+            {
+              "enum": [
+                "not_in_past",
+                "not_in_future"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Date Constraint"
+        }
+      },
+      "title": "ValidationRules",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "0.2.0-proposal",
+      "default": "0.2.0-proposal",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source": {
+      "$ref": "#/$defs/Source"
+    },
+    "app": {
+      "$ref": "#/$defs/AppInfo"
+    },
+    "entity": {
+      "$ref": "#/$defs/EntitySpec"
+    },
+    "screens": {
+      "items": {
+        "$ref": "#/$defs/Screen"
+      },
+      "maxItems": 2,
+      "minItems": 2,
+      "title": "Screens",
+      "type": "array"
+    },
+    "navigation": {
+      "$ref": "#/$defs/Navigation"
+    },
+    "behaviors": {
+      "$ref": "#/$defs/Behaviors"
+    },
+    "messages": {
+      "$ref": "#/$defs/Messages"
+    },
+    "deferred_rules": {
+      "items": {
+        "$ref": "#/$defs/DeferredRule"
+      },
+      "title": "Deferred Rules",
+      "type": "array"
+    },
+    "warnings": {
+      "description": "Gaps the Architect noticed; shown to the PM agent.",
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "app",
+    "entity",
+    "screens",
+    "navigation",
+    "behaviors",
+    "messages"
+  ],
+  "title": "BUNYAN AI architecture.json (PROPOSAL - not yet approved by the team)",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "bunyan-ai/architect/architecture.schema.json",
+  "$comment": "Provisional contract v0.2.0-proposal. Generated from backend/agents/architect/schema.py; do not edit by hand. Cross-reference rules are enforced by the Pydantic model only."
+}
