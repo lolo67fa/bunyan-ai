@@ -1,0 +1,4 @@
+{
+  "title": "Task manager (English)",
+  "idea": "I need a simple task manager for my studies. I want to add tasks with a title, an optional description, a due date, a priority (low, medium, high) and a status (to do, in progress, done). I should be able to see all my tasks, search them by title, filter by status, edit them and delete the ones I no longer need."
+}

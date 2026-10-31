@@ -1,0 +1,792 @@
+{
+  "$defs": {
+    "AcceptanceCriterion": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^AC-\\d+$",
+          "title": "Id",
+          "type": "string"
+        },
+        "story_id": {
+          "pattern": "^US-\\d+$",
+          "title": "Story Id",
+          "type": "string"
+        },
+        "category": {
+          "enum": [
+            "create",
+            "read",
+            "update",
+            "delete",
+            "validation",
+            "persistence",
+            "other"
+          ],
+          "title": "Category",
+          "type": "string"
+        },
+        "given": {
+          "minLength": 5,
+          "title": "Given",
+          "type": "string"
+        },
+        "when": {
+          "minLength": 5,
+          "title": "When",
+          "type": "string"
+        },
+        "then": {
+          "description": "Observable, testable outcome (used by the QA Agent).",
+          "minLength": 5,
+          "title": "Then",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "story_id",
+        "category",
+        "given",
+        "when",
+        "then"
+      ],
+      "title": "AcceptanceCriterion",
+      "type": "object"
+    },
+    "AppInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "minLength": 2,
+          "title": "Name",
+          "type": "string"
+        },
+        "description": {
+          "minLength": 10,
+          "title": "Description",
+          "type": "string"
+        },
+        "target_users": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Target Users",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "description"
+      ],
+      "title": "AppInfo",
+      "type": "object"
+    },
+    "ClarificationQuestion": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^Q-\\d+$",
+          "title": "Id",
+          "type": "string"
+        },
+        "question": {
+          "minLength": 5,
+          "title": "Question",
+          "type": "string"
+        },
+        "reason": {
+          "minLength": 5,
+          "title": "Reason",
+          "type": "string"
+        },
+        "blocking": {
+          "description": "True if requirements cannot be finalised without an answer.",
+          "title": "Blocking",
+          "type": "boolean"
+        },
+        "options": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Options",
+          "type": "array"
+        },
+        "suggested_default": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Suggested Default"
+        }
+      },
+      "required": [
+        "id",
+        "question",
+        "reason",
+        "blocking"
+      ],
+      "title": "ClarificationQuestion",
+      "type": "object"
+    },
+    "CrudSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "create": {
+          "$ref": "#/$defs/OperationSpec"
+        },
+        "read": {
+          "$ref": "#/$defs/ReadSpec"
+        },
+        "update": {
+          "$ref": "#/$defs/OperationSpec"
+        },
+        "delete": {
+          "$ref": "#/$defs/DeleteSpec"
+        }
+      },
+      "required": [
+        "create",
+        "read",
+        "update",
+        "delete"
+      ],
+      "title": "CrudSpec",
+      "type": "object"
+    },
+    "DeleteSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "details": {
+          "default": "",
+          "title": "Details",
+          "type": "string"
+        },
+        "requires_confirmation": {
+          "default": true,
+          "title": "Requires Confirmation",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "title": "DeleteSpec",
+      "type": "object"
+    },
+    "Entity": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "description": "PascalCase English identifier, singular.",
+          "pattern": "^[A-Z][A-Za-z0-9]*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "label": {
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        },
+        "plural_label": {
+          "minLength": 1,
+          "title": "Plural Label",
+          "type": "string"
+        },
+        "description": {
+          "default": "",
+          "title": "Description",
+          "type": "string"
+        },
+        "display_field": {
+          "description": "Field used as the record title in lists and confirmations.",
+          "title": "Display Field",
+          "type": "string"
+        },
+        "fields": {
+          "items": {
+            "$ref": "#/$defs/EntityField"
+          },
+          "minItems": 1,
+          "title": "Fields",
+          "type": "array"
+        },
+        "crud": {
+          "$ref": "#/$defs/CrudSpec"
+        }
+      },
+      "required": [
+        "name",
+        "label",
+        "plural_label",
+        "display_field",
+        "fields",
+        "crud"
+      ],
+      "title": "Entity",
+      "type": "object"
+    },
+    "EntityField": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "description": "snake_case English identifier.",
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "label": {
+          "description": "Display label in the input language.",
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "string",
+            "text",
+            "integer",
+            "decimal",
+            "boolean",
+            "date",
+            "time",
+            "datetime",
+            "email",
+            "phone",
+            "url",
+            "enum",
+            "reference"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "required": {
+          "title": "Required",
+          "type": "boolean"
+        },
+        "unique": {
+          "default": false,
+          "title": "Unique",
+          "type": "boolean"
+        },
+        "description": {
+          "default": "",
+          "title": "Description",
+          "type": "string"
+        },
+        "enum_values": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Enum Values"
+        },
+        "reference_entity": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reference Entity"
+        },
+        "default": {
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Default"
+        },
+        "validation": {
+          "$ref": "#/$defs/ValidationRules"
+        }
+      },
+      "required": [
+        "name",
+        "label",
+        "type",
+        "required"
+      ],
+      "title": "EntityField",
+      "type": "object"
+    },
+    "FunctionalRequirement": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^FR-\\d+$",
+          "title": "Id",
+          "type": "string"
+        },
+        "entity": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Entity"
+        },
+        "category": {
+          "enum": [
+            "create",
+            "read",
+            "update",
+            "delete",
+            "validation",
+            "persistence",
+            "other"
+          ],
+          "title": "Category",
+          "type": "string"
+        },
+        "description": {
+          "minLength": 10,
+          "title": "Description",
+          "type": "string"
+        },
+        "priority": {
+          "default": "must",
+          "enum": [
+            "must",
+            "should",
+            "could"
+          ],
+          "title": "Priority",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "category",
+        "description"
+      ],
+      "title": "FunctionalRequirement",
+      "type": "object"
+    },
+    "OperationSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "details": {
+          "default": "",
+          "title": "Details",
+          "type": "string"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "title": "OperationSpec",
+      "type": "object"
+    },
+    "OutOfScopeItem": {
+      "additionalProperties": false,
+      "properties": {
+        "feature": {
+          "description": "What the user asked for.",
+          "minLength": 2,
+          "title": "Feature",
+          "type": "string"
+        },
+        "category": {
+          "enum": [
+            "authentication",
+            "payments",
+            "native_mobile",
+            "server_backend",
+            "realtime_collaboration",
+            "enterprise_system",
+            "external_integration",
+            "file_storage",
+            "other"
+          ],
+          "title": "Category",
+          "type": "string"
+        },
+        "reason": {
+          "minLength": 5,
+          "title": "Reason",
+          "type": "string"
+        },
+        "action": {
+          "enum": [
+            "excluded",
+            "replaced_with_crud_alternative"
+          ],
+          "title": "Action",
+          "type": "string"
+        },
+        "alternative": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Alternative"
+        }
+      },
+      "required": [
+        "feature",
+        "category",
+        "reason",
+        "action"
+      ],
+      "title": "OutOfScopeItem",
+      "type": "object"
+    },
+    "ReadSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "details": {
+          "default": "",
+          "title": "Details",
+          "type": "string"
+        },
+        "list_fields": {
+          "description": "Columns shown in the list view.",
+          "items": {
+            "type": "string"
+          },
+          "title": "List Fields",
+          "type": "array"
+        },
+        "search_fields": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Search Fields",
+          "type": "array"
+        },
+        "filter_fields": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Filter Fields",
+          "type": "array"
+        },
+        "sort_field": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sort Field"
+        },
+        "sort_direction": {
+          "default": "asc",
+          "enum": [
+            "asc",
+            "desc"
+          ],
+          "title": "Sort Direction",
+          "type": "string"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "title": "ReadSpec",
+      "type": "object"
+    },
+    "UserStory": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^US-\\d+$",
+          "title": "Id",
+          "type": "string"
+        },
+        "role": {
+          "description": "'As a ...'",
+          "minLength": 2,
+          "title": "Role",
+          "type": "string"
+        },
+        "goal": {
+          "description": "'I want to ...'",
+          "minLength": 5,
+          "title": "Goal",
+          "type": "string"
+        },
+        "benefit": {
+          "description": "'so that ...'",
+          "minLength": 5,
+          "title": "Benefit",
+          "type": "string"
+        },
+        "entity": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Entity"
+        },
+        "operation": {
+          "anyOf": [
+            {
+              "enum": [
+                "create",
+                "read",
+                "update",
+                "delete"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Operation"
+        },
+        "requirement_ids": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Requirement Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "role",
+        "goal",
+        "benefit",
+        "requirement_ids"
+      ],
+      "title": "UserStory",
+      "type": "object"
+    },
+    "ValidationRules": {
+      "additionalProperties": false,
+      "description": "Constraints the generated form must enforce for one field.",
+      "properties": {
+        "min_length": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Min Length"
+        },
+        "max_length": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Length"
+        },
+        "min_value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Min Value"
+        },
+        "max_value": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Value"
+        },
+        "pattern": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "JavaScript-compatible regular expression.",
+          "title": "Pattern"
+        },
+        "date_constraint": {
+          "anyOf": [
+            {
+              "enum": [
+                "not_in_past",
+                "not_in_future"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Date Constraint"
+        }
+      },
+      "title": "ValidationRules",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Top-level ``requirements.json`` document (provisional contract).",
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0-proposal",
+      "default": "0.1.0-proposal",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "status": {
+      "description": "ready_for_review: complete, awaiting user approval before the Architect runs. needs_clarification: blocking questions must be answered first. rejected_out_of_scope: the idea cannot be reduced to a CRUD MVP.",
+      "enum": [
+        "ready_for_review",
+        "needs_clarification",
+        "rejected_out_of_scope"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "language": {
+      "enum": [
+        "en",
+        "ar"
+      ],
+      "title": "Language",
+      "type": "string"
+    },
+    "source_idea": {
+      "minLength": 1,
+      "title": "Source Idea",
+      "type": "string"
+    },
+    "app": {
+      "$ref": "#/$defs/AppInfo"
+    },
+    "entities": {
+      "items": {
+        "$ref": "#/$defs/Entity"
+      },
+      "title": "Entities",
+      "type": "array"
+    },
+    "functional_requirements": {
+      "items": {
+        "$ref": "#/$defs/FunctionalRequirement"
+      },
+      "title": "Functional Requirements",
+      "type": "array"
+    },
+    "user_stories": {
+      "items": {
+        "$ref": "#/$defs/UserStory"
+      },
+      "title": "User Stories",
+      "type": "array"
+    },
+    "acceptance_criteria": {
+      "items": {
+        "$ref": "#/$defs/AcceptanceCriterion"
+      },
+      "title": "Acceptance Criteria",
+      "type": "array"
+    },
+    "clarification_questions": {
+      "items": {
+        "$ref": "#/$defs/ClarificationQuestion"
+      },
+      "title": "Clarification Questions",
+      "type": "array"
+    },
+    "assumptions": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Assumptions",
+      "type": "array"
+    },
+    "out_of_scope": {
+      "items": {
+        "$ref": "#/$defs/OutOfScopeItem"
+      },
+      "title": "Out Of Scope",
+      "type": "array"
+    }
+  },
+  "required": [
+    "status",
+    "language",
+    "source_idea",
+    "app"
+  ],
+  "title": "BUNYAN AI requirements.json (PROPOSAL - not yet approved by the team)",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "bunyan-ai/business-analyst/requirements.schema.json",
+  "$comment": "Provisional contract v0.1.0-proposal. Generated from backend/agents/business_analyst/schema.py; do not edit by hand. Cross-reference rules (CRUD coverage, story/criterion links) are enforced by the Pydantic model only."
+}
