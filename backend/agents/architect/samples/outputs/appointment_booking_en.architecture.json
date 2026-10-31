@@ -1,0 +1,291 @@
+{
+  "schema_version": "0.2.0-proposal",
+  "source": {
+    "requirements_schema_version": "0.1.0-proposal"
+  },
+  "app": {
+    "name": "Appointment Booking",
+    "description": "A web app for a small clinic receptionist to book, view, reschedule and cancel client appointments.",
+    "language": "en",
+    "direction": "ltr"
+  },
+  "entity": {
+    "name": "Appointment",
+    "label": "Appointment",
+    "plural_label": "Appointments",
+    "display_field": "client_name",
+    "storage": {
+      "engine": "localStorage",
+      "key": "bunyan_appointment",
+      "id_field": "id",
+      "id_strategy": "uuid",
+      "system_fields": [
+        "id",
+        "created_at",
+        "updated_at"
+      ]
+    },
+    "fields": [
+      {
+        "name": "client_name",
+        "label": "Client name",
+        "type": "string",
+        "input": "text",
+        "required": true,
+        "unique": false,
+        "validation": {
+          "min_length": 2,
+          "max_length": 100
+        },
+        "show_in_list": true
+      },
+      {
+        "name": "client_phone",
+        "label": "Client phone",
+        "type": "phone",
+        "input": "tel",
+        "required": true,
+        "unique": false,
+        "validation": {
+          "pattern": "^\\+?[0-9]{9,15}$"
+        },
+        "show_in_list": false
+      },
+      {
+        "name": "service",
+        "label": "Service",
+        "type": "enum",
+        "input": "select",
+        "required": true,
+        "unique": false,
+        "options": [
+          {
+            "value": "consultation",
+            "label": "Consultation"
+          },
+          {
+            "value": "follow_up",
+            "label": "Follow up"
+          },
+          {
+            "value": "check_up",
+            "label": "Check up"
+          }
+        ],
+        "validation": {},
+        "show_in_list": true
+      },
+      {
+        "name": "date",
+        "label": "Date",
+        "type": "date",
+        "input": "date",
+        "required": true,
+        "unique": false,
+        "validation": {
+          "date_constraint": "not_in_past"
+        },
+        "show_in_list": true
+      },
+      {
+        "name": "time",
+        "label": "Time",
+        "type": "time",
+        "input": "time",
+        "required": true,
+        "unique": false,
+        "validation": {},
+        "show_in_list": true
+      },
+      {
+        "name": "duration_minutes",
+        "label": "Duration (minutes)",
+        "type": "integer",
+        "input": "number",
+        "required": true,
+        "unique": false,
+        "default": 30,
+        "step": 1.0,
+        "validation": {
+          "min_value": 15.0,
+          "max_value": 240.0
+        },
+        "show_in_list": false
+      },
+      {
+        "name": "status",
+        "label": "Status",
+        "type": "enum",
+        "input": "select",
+        "required": true,
+        "unique": false,
+        "default": "scheduled",
+        "options": [
+          {
+            "value": "scheduled",
+            "label": "Scheduled"
+          },
+          {
+            "value": "completed",
+            "label": "Completed"
+          },
+          {
+            "value": "cancelled",
+            "label": "Cancelled"
+          }
+        ],
+        "validation": {},
+        "show_in_list": true
+      },
+      {
+        "name": "notes",
+        "label": "Notes",
+        "type": "text",
+        "input": "textarea",
+        "required": false,
+        "unique": false,
+        "validation": {
+          "max_length": 500
+        },
+        "show_in_list": false
+      }
+    ]
+  },
+  "screens": [
+    {
+      "id": "list",
+      "type": "list",
+      "title": "Appointments",
+      "components": [
+        {
+          "type": "header"
+        },
+        {
+          "type": "add_button",
+          "label": "Add Appointment"
+        },
+        {
+          "type": "search",
+          "fields": [
+            "client_name",
+            "client_phone"
+          ],
+          "placeholder": "Search Appointments"
+        },
+        {
+          "type": "filters",
+          "fields": [
+            "status",
+            "service",
+            "date"
+          ]
+        },
+        {
+          "type": "table",
+          "columns": [
+            "client_name",
+            "date",
+            "time",
+            "service",
+            "status"
+          ],
+          "sort": {
+            "field": "date",
+            "direction": "asc"
+          },
+          "row_actions": [
+            "edit",
+            "delete"
+          ]
+        },
+        {
+          "type": "empty_state"
+        }
+      ]
+    },
+    {
+      "id": "form",
+      "type": "form",
+      "title": "Appointment details",
+      "modes": [
+        "create",
+        "edit"
+      ],
+      "components": [
+        {
+          "type": "form_fields",
+          "fields": [
+            "client_name",
+            "client_phone",
+            "service",
+            "date",
+            "time",
+            "duration_minutes",
+            "status",
+            "notes"
+          ]
+        },
+        {
+          "type": "save_button",
+          "label": "Save"
+        },
+        {
+          "type": "cancel_button",
+          "label": "Cancel"
+        }
+      ]
+    }
+  ],
+  "navigation": {
+    "initial_screen": "list",
+    "transitions": [
+      {
+        "from": "list",
+        "event": "add",
+        "to": "form",
+        "mode": "create"
+      },
+      {
+        "from": "list",
+        "event": "edit",
+        "to": "form",
+        "mode": "edit"
+      },
+      {
+        "from": "form",
+        "event": "save_success",
+        "to": "list"
+      },
+      {
+        "from": "form",
+        "event": "cancel",
+        "to": "list"
+      }
+    ]
+  },
+  "behaviors": {
+    "validate_before_save": true,
+    "check_unique_before_save": false,
+    "prefill_form_on_edit": true,
+    "load_on_start": true,
+    "delete_confirmation": "inline",
+    "after_save": "show_message_and_return_to_list",
+    "after_delete": "remove_row_and_show_message"
+  },
+  "messages": {
+    "empty": "No Appointments yet.",
+    "required": "This field is required",
+    "invalid": "Invalid value",
+    "unique": "This value is already in use",
+    "created": "Added successfully",
+    "updated": "Changes saved",
+    "deleted": "Deleted",
+    "confirm_delete": "Delete “{display}”?",
+    "confirm_button": "Confirm delete",
+    "cancel_delete_button": "Keep",
+    "edit_button": "Edit",
+    "delete_button": "Delete"
+  },
+  "deferred_rules": [],
+  "warnings": []
+}
