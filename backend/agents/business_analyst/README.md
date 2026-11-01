@@ -178,6 +178,16 @@ pytest backend/agents/business_analyst/tests
 BA_RUN_LLM_EVALS=1 pytest backend/agents/business_analyst/evals -v
 ```
 
+### Single live test in GitHub Actions
+
+`live_check.py` runs **one** real analysis of the Gulf-dialect inventory idea and writes `summary.json`, `summary.md` and `requirements.json`. It refuses to start unless the settings allow only one paid request (`BA_LLM_BACKEND=direct`, `BA_MAX_RETRIES=0`, `BA_FALLBACKS=off`, `BA_SDK_MAX_RETRIES=0`). It also checks the model with two free calls (Models API, token counting) first. The manual workflow `.github/workflows/ba-live-test.yml` sets all of this and reads `ANTHROPIC_API_KEY` from the repository secrets:
+
+```bash
+BA_MODE=llm BA_LLM_PROVIDER=anthropic BA_LLM_MODEL=claude-opus-5-5 BA_LLM_BACKEND=direct \
+BA_MAX_RETRIES=0 BA_FALLBACKS=off BA_SDK_MAX_RETRIES=0 \
+python -m backend.agents.business_analyst.live_check --out live-test-output
+```
+
 What the mock tests cover:
 
 - `test_schema.py`: all sample outputs validate; JSON round trip; 25 kinds of broken documents are rejected (bad IDs, dangling references, type/rule mismatches, missing CRUD coverage, vague criteria in English and Arabic, and more).
@@ -190,6 +200,7 @@ What the mock tests cover:
 - `test_contract_rules.py`: defaults must match the field type and range; stories stay on their own entity; ready documents need list columns and a `suggested_default` on every optional question; rejected documents carry no requirements.
 - `test_status_transitions.py`: the three statuses and the moves between them (clarification → answers → ready, unhelpful answers, rejected → answers with CRUD content), and CRUD ideas with out-of-scope extras are asked about instead of rejected.
 - `test_scenarios.py`: evaluation scenarios A (tasks), B (inventory, Gulf dialect) and C (bookings, Gulf dialect): entities, fields, validation, CRUD coverage and consistency between requirements, stories and criteria.
+- `test_live_check.py`: the live-test runner with a **fake client**: exactly one request, no retry after an invalid answer, nothing sent when the pre-flight fails or the settings allow more than one request, and the API key never appears in the outputs.
 - `test_crew_wiring.py`: CrewAI Agent / Task / Crew are built offline (no `kickoff`, no network); skipped when CrewAI is not installed.
 
 The evals check behaviour (status, language, expected entity, flagged scope categories) rather than exact wording, and save every output plus a timing report to `evals/output/` (git-ignored).

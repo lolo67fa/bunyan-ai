@@ -144,3 +144,46 @@ def test_new_sdk_keeps_native_keywords():
 
     request = adapt_to_sdk(build_request("prompt", _settings()), new_stream)
     assert request["output_config"] == {"effort": "high"} and "extra_body" not in request
+
+
+# --- single-call controls (used by the live GitHub Actions test) ----------------------------------
+
+def test_fallbacks_can_be_switched_off():
+    request = build_request("prompt", _settings(fallbacks=False))
+    assert "fallbacks" not in request and "betas" not in request
+
+
+def test_fallbacks_and_sdk_retries_from_environment(monkeypatch):
+    monkeypatch.setenv("BA_FALLBACKS", "off")
+    monkeypatch.setenv("BA_SDK_MAX_RETRIES", "0")
+    settings = get_settings("llm")
+    assert settings.fallbacks is False and settings.sdk_max_retries == 0
+
+
+def test_fallbacks_default_on_and_sdk_retries_default_none(monkeypatch):
+    for var in ("BA_FALLBACKS", "BA_SDK_MAX_RETRIES"):
+        monkeypatch.delenv(var, raising=False)
+    settings = get_settings("llm")
+    assert settings.fallbacks is True and settings.sdk_max_retries is None
+
+
+def test_invalid_fallbacks_value(monkeypatch):
+    monkeypatch.setenv("BA_FALLBACKS", "maybe")
+    with pytest.raises(ConfigError, match="BA_FALLBACKS"):
+        get_settings("llm")
+
+
+def test_on_message_receives_the_final_message():
+    seen = []
+    client = FakeClient([mock_generate(IDEA, "ar")])
+    run_direct("prompt", _settings(), client=client, on_message=seen.append)
+    assert len(seen) == 1 and seen[0]._request_id == "req_test"
+
+
+def test_zero_retries_means_exactly_one_request():
+    """BA_MAX_RETRIES=0: an invalid answer is not sent back to the model."""
+    client = FakeClient(['{"status": "ready_for_review"}', mock_generate(IDEA, "ar")])
+    with pytest.raises(AnalysisError):
+        analyze(IDEA, mode="llm", settings=_settings(max_retries=0),
+                llm_generator=lambda d, s: run_direct(d, s, client=client))
+    assert len(client.requests) == 1

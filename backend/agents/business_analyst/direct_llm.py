@@ -12,7 +12,7 @@ Anthropic models only. Other providers use the CrewAI backend.
 from __future__ import annotations
 
 import inspect
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 
 from .config import ConfigError, Settings
 from .prompts import BACKSTORY, EXPECTED_OUTPUT, GOAL, ROLE
@@ -44,7 +44,7 @@ def build_request(description: str, settings: Settings) -> Dict[str, Any]:
         "messages": [{"role": "user", "content": description}],
         "output_config": {"effort": settings.effort},
     }
-    if model in _FALLBACK_MODELS:
+    if settings.fallbacks and model in _FALLBACK_MODELS:
         request["betas"] = [_FALLBACK_BETA]
         request["fallbacks"] = "default"
     return request
@@ -66,15 +66,28 @@ def adapt_to_sdk(request: Dict[str, Any], stream_fn: Any) -> Dict[str, Any]:
     return request
 
 
-def run_direct(description: str, settings: Settings, client: Optional[Any] = None) -> str:
-    """Call Claude once and return the text of the answer. ``client`` is injectable for tests."""
+def run_direct(
+    description: str,
+    settings: Settings,
+    client: Optional[Any] = None,
+    on_message: Optional[Callable[[Any], None]] = None,
+) -> str:
+    """Call Claude once and return the text of the answer.
+
+    ``client`` is injectable for tests. ``on_message`` receives the final SDK message
+    (usage, request id, stop reason) before the answer is checked, e.g. for cost reports.
+    """
     if client is None:
         import anthropic
 
-        client = anthropic.Anthropic()  # credentials from ANTHROPIC_API_KEY / ANTHROPIC_AUTH_TOKEN
+        # Credentials from ANTHROPIC_API_KEY / ANTHROPIC_AUTH_TOKEN.
+        options = {} if settings.sdk_max_retries is None else {"max_retries": settings.sdk_max_retries}
+        client = anthropic.Anthropic(**options)
     stream_fn = client.beta.messages.stream
     with stream_fn(**adapt_to_sdk(build_request(description, settings), stream_fn)) as stream:
         message = stream.get_final_message()
+    if on_message is not None:
+        on_message(message)
 
     if message.stop_reason == "refusal":
         details = getattr(message, "stop_details", None)

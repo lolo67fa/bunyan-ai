@@ -124,6 +124,8 @@ def run_analysis(project):                          # state: analyzing
   | `BA_LLM_BACKEND` | `crewai` | `crewai` (CrewAI agent) or `direct` (Anthropic SDK; no CrewAI install needed) |
   | `BA_EFFORT` | `high` | Anthropic `output_config.effort` (direct backend) |
   | `BA_MAX_RETRIES` | `2` | extra attempts when output fails validation |
+  | `BA_FALLBACKS` | `on` | direct backend: server-side refusal fallback (`off` = a refusal is returned instead of a second, billed attempt) |
+  | `BA_SDK_MAX_RETRIES` | unset (SDK default 2) | direct backend: Anthropic SDK transport retries on 429/5xx/connection errors |
   | `BA_TEMPERATURE` | unset | only forwarded to non-Anthropic providers; the Anthropic API rejects sampling parameters |
   | `ANTHROPIC_API_KEY` / `ANTHROPIC_AUTH_TOKEN` / `OPENAI_API_KEY` | none | credentials (git-ignored `.env` only) |
 

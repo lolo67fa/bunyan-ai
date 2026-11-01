@@ -44,6 +44,8 @@ class Settings:
     verbose: bool
     backend: str = "crewai"   # "crewai" (default) or "direct" (Anthropic SDK, no CrewAI needed)
     effort: str = "high"      # Anthropic output_config.effort (direct backend)
+    fallbacks: bool = True    # server-side refusal fallback (direct backend); a fallback is a second, billed attempt
+    sdk_max_retries: Optional[int] = None  # Anthropic SDK transport retries (direct backend); None = SDK default (2)
 
     @property
     def litellm_model(self) -> str:
@@ -90,6 +92,10 @@ def get_settings(mode: Optional[str] = None) -> Settings:
     if effort not in _EFFORTS:
         raise ConfigError(f"BA_EFFORT must be one of {sorted(_EFFORTS)}, got '{effort}'")
     temperature = _env("BA_TEMPERATURE")
+    fallbacks = (_env("BA_FALLBACKS") or "on").lower()
+    if fallbacks not in {"on", "off"}:
+        raise ConfigError(f"BA_FALLBACKS must be 'on' or 'off', got '{fallbacks}'")
+    sdk_retries = _env("BA_SDK_MAX_RETRIES")
     return Settings(
         mode=resolved_mode,
         provider=provider.lower() if provider else None,
@@ -99,4 +105,6 @@ def get_settings(mode: Optional[str] = None) -> Settings:
         verbose=(_env("BA_VERBOSE") or "false").lower() in {"1", "true", "yes"},
         backend=backend,
         effort=effort,
+        fallbacks=fallbacks == "on",
+        sdk_max_retries=int(sdk_retries) if sdk_retries is not None else None,
     )
