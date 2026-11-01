@@ -1,10 +1,16 @@
-from fastapi import FastAPI
+
+import uuid
+
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+
 from backend.schemas.contracts import ProjectRequest
+from backend.storage import save_project, load_project
 
-app = FastAPI(title="Bunyan AI Backend - Mock Pipeline")
 
-# السماح للواجهة الأمامية بالاتصال بالـ Backend بدون قيود
+app = FastAPI(title="Bunyan AI Backend")
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -13,23 +19,34 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.post("/projects")
+
+@app.post("/projects", status_code=201)
 def create_project(data: ProjectRequest):
-    return {
-        "project_id": "bunyan-demo-01",
+
+    project_id = str(uuid.uuid4())
+
+    project = {
+        "project_id": project_id,
+        "idea": data.prompt,
         "status": "requirements_pending",
-        "requirements": {
-            "entity": "مهمة (Task)",
-            "fields": ["العنوان", "الوصف", "الحالة"],
-            "operations": ["Create", "Read", "Update", "Delete"]
-        }
+        "current_agent": "business_analyst",
+        "requirements": None
     }
 
+    save_project(project)
+
+    return project
+
+
 @app.get("/projects/{project_id}")
-def get_project_pipeline(project_id: str):
-    return {
-        "project_id": project_id,
-        "status": "completed",
-        "architecture": {"storage": "localStorage", "template": "CRUD-Fixed"},
-        "test_report": {"passed": 8, "failed": 0, "success_rate": "100%"}
-    }
+def get_project_pipeline(project_id: uuid.UUID):
+
+    project = load_project(str(project_id))
+
+    if project is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Project not found"
+        )
+
+    return project
