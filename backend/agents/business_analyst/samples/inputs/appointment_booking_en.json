@@ -1,0 +1,4 @@
+{
+  "title": "Appointment booking (English, includes out-of-scope SMS reminders)",
+  "idea": "Build an appointment booking app for a small dental clinic. The receptionist books appointments with the client's name, phone number, service type, date, time, duration and notes, and can reschedule or cancel them. Two appointments must not be booked at the same time. It would also be great to send SMS reminders to clients the day before."
+}
