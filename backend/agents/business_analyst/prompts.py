@@ -63,10 +63,17 @@ Output rules:
    list/search, edit, delete with confirmation and cancelled delete.
 8. status:
    - "ready_for_review" when the idea is clear enough; record reasonable assumptions in "assumptions" and
-     put optional questions with blocking=false and a suggested_default.
+     put optional questions with blocking=false and a suggested_default (required for every optional question).
    - "needs_clarification" when you cannot identify the main entities or their key fields; ask
      blocking questions (blocking=true). Entities and requirements may then be partial or empty.
    - "rejected_out_of_scope" when nothing meaningful remains after removing out-of-scope features.
+     Then leave entities, functional_requirements, user_stories and acceptance_criteria empty.
+9. Model only what the user asked for. Do not add entities (for example categories) or business rules
+   (for example "no double booking") the idea does not mention; offer them as optional questions instead.
+10. When a word is ambiguous (for example "cancel" may mean delete or a status change), choose the
+   simplest CRUD interpretation, state it in "assumptions" and add an optional question about it.
+11. Every entity's crud.read.list_fields must name at least one field. A "default" must be a valid value
+   of the field's type (a number for integer/decimal, true/false for boolean, one of enum_values for enum).
 """
 
 

@@ -21,6 +21,9 @@ ALL_SAMPLES = [
     "appointment_booking_en",
     "vague_idea_en",
     "out_of_scope_ar",
+    "scenario_a_task_en",
+    "scenario_b_inventory_ar",
+    "scenario_c_booking_ar",
 ]
 
 

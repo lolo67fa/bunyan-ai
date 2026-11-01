@@ -37,7 +37,7 @@ business_analyst/
 ├── __main__.py               ← command line interface
 ├── regenerate_samples.py     ← rebuilds samples/outputs and the JSON Schema
 ├── samples/
-│   ├── inputs/               ← task manager, inventory (Arabic + Gulf dialect), appointment booking, vague, out-of-scope
+│   ├── inputs/               ← task manager, inventory (Arabic + Gulf dialect), appointment booking, vague, out-of-scope, scenarios A–C
 │   ├── answers/              ← example answers to clarification questions
 │   └── outputs/              ← requirements.json produced in mock mode ← give these to the Architect
 ├── tests/                    ← OFFLINE mock tests (free, always run)
@@ -173,7 +173,7 @@ requirements_json = doc.model_dump_json(indent=2)
 # Offline mock tests: schema validity, missing information, CRUD scope, pipeline, CLI
 pytest backend/agents/business_analyst/tests
 
-# Live LLM evaluations (costs money: 6 samples, 1 to 3 model calls each)
+# Live LLM evaluations (costs money: 9 samples, 1 to 3 model calls each)
 # PowerShell:  $env:BA_RUN_LLM_EVALS="1"; pytest backend/agents/business_analyst/evals -v
 BA_RUN_LLM_EVALS=1 pytest backend/agents/business_analyst/evals -v
 ```
@@ -184,8 +184,13 @@ What the mock tests cover:
 - `test_missing_information.py`: vague ideas (English/Arabic) give `needs_clarification` with blocking questions; answers resolve them; a `ready_for_review` document cannot keep blocking questions.
 - `test_scope.py`: the guard detects 8 out-of-scope categories in English and Arabic without flagging plain CRUD ideas; mixed ideas keep the CRUD core; fully out-of-scope ideas are rejected; an LLM answer that sneaks a login or payment requirement in is rejected.
 - `test_direct_backend.py`: the direct Anthropic backend with a **fake client**: no sampling parameters sent, effort and fallback set, refusal / truncation handling, dialect input end to end.
-- `test_architect_handoff.py`: a reference consumer derives storage keys, form inputs, validation attributes, list/search/filter/sort and RTL from every ready sample, the way the Architect would.
+- `test_architect_handoff.py`: a reference consumer derives storage keys, form inputs, validation attributes, list/search/filter/sort and RTL from every ready sample, and every ready sample is checked against the real Architect's input rules (PR #4).
 - `test_pipeline.py`: LLM mode with a **fake** model (retry with errors, give-up after max retries, code-fence tolerance), configuration and model overrides, CLI exit codes, and a check that committed samples and JSON Schema are up to date.
+- `test_input_contract.py`: `idea` is canonical, the deprecated `prompt` alias maps to it, conflicting values are refused; missing / blank / wordless / over-long ideas, badly typed or blank answers, blank feedback; Arabic, English and mixed input; identical requests give identical documents.
+- `test_contract_rules.py`: defaults must match the field type and range; stories stay on their own entity; ready documents need list columns and a `suggested_default` on every optional question; rejected documents carry no requirements.
+- `test_status_transitions.py`: the three statuses and the moves between them (clarification → answers → ready, unhelpful answers, rejected → answers with CRUD content), and CRUD ideas with out-of-scope extras are asked about instead of rejected.
+- `test_scenarios.py`: evaluation scenarios A (tasks), B (inventory, Gulf dialect) and C (bookings, Gulf dialect): entities, fields, validation, CRUD coverage and consistency between requirements, stories and criteria.
+- `test_crew_wiring.py`: CrewAI Agent / Task / Crew are built offline (no `kickoff`, no network); skipped when CrewAI is not installed.
 
 The evals check behaviour (status, language, expected entity, flagged scope categories) rather than exact wording, and save every output plus a timing report to `evals/output/` (git-ignored).
 
@@ -193,8 +198,14 @@ The evals check behaviour (status, language, expected entity, flagged scope cate
 
 - **Start here:** [`contract/INTEGRATION.md`](contract/INTEGRATION.md) (interface, mapping to architecture, open decisions)
 - Contract: [`contract/CONTRACT.md`](contract/CONTRACT.md) · JSON Schema: [`contract/requirements.schema.proposal.json`](contract/requirements.schema.proposal.json)
-- Ready-to-use inputs: [`samples/outputs/task_manager_en.requirements.json`](samples/outputs/task_manager_en.requirements.json), [`inventory_manager_ar.requirements.json`](samples/outputs/inventory_manager_ar.requirements.json) (Arabic, two entities with a `reference` field), [`appointment_booking_en.requirements.json`](samples/outputs/appointment_booking_en.requirements.json)
+- Ready-to-use inputs: [`samples/outputs/task_manager_en.requirements.json`](samples/outputs/task_manager_en.requirements.json), the evaluation scenarios [`scenario_a_task_en`](samples/outputs/scenario_a_task_en.requirements.json), [`scenario_b_inventory_ar`](samples/outputs/scenario_b_inventory_ar.requirements.json), [`scenario_c_booking_ar`](samples/outputs/scenario_c_booking_ar.requirements.json), and [`inventory_manager_ar.requirements.json`](samples/outputs/inventory_manager_ar.requirements.json) (Arabic, two entities with a `reference` field; refused by the Architect until decision D9)
 - Validate in Python: `RequirementsDocument.model_validate_json(text)`. Only run when `status == "ready_for_review"` **and** the user has approved.
+- Handoff results against the real Architect builder: [`contract/INTEGRATION.md`](contract/INTEGRATION.md) §3.1.
+
+## For the backend (Alanoud)
+
+- The canonical input field is **`idea`** (the frontend already sends it). The current backend uses `prompt`, so the frontend's `POST /projects` fails with 422. A proposed patch and the BA-status → workflow-state mapping are in [`contract/INTEGRATION.md`](contract/INTEGRATION.md) §2. The agent accepts `prompt` as a deprecated alias in the meantime.
+- BA `status` values (`ready_for_review`, `needs_clarification`, `rejected_out_of_scope`) are **not** workflow states; the orchestrator maps them.
 
 ## After changing the schema or mock templates
 
@@ -205,8 +216,9 @@ pytest backend/agents/business_analyst/tests
 
 ## Known limitations
 
-- **LLM mode has not been run against a real model yet: no API key was available.** CrewAI 1.15.23 is installed and verified up to the network: both backends build a valid request that reaches Anthropic and is rejected only for the missing key (HTTP 401). Status per check: [`contract/INTEGRATION.md`](contract/INTEGRATION.md) §5.
-- Mock mode recognises only the three demo domains; it is for testing, not analysis.
-- The scope guard is keyword-based. It can miss unusual phrasings, and the LLM is the first line of defence. It is tuned to avoid flagging CRUD data such as a `payment_status` field or a library "checkout".
+- **LLM mode has not been run against a real model yet: no API key was available.** CrewAI 1.15.23 is installed and verified up to the network: both backends build a valid request that reaches Anthropic and is rejected only for the missing key (HTTP 401). The prompt rules added on 2026-11-01 (rules 9 to 11) are also untested against a real model. Mock-mode results, including scenarios A–C, are **not** evidence of live LLM quality. Status per check: [`contract/INTEGRATION.md`](contract/INTEGRATION.md) §5.
+- Mock mode recognises only the demo domains (tasks; inventory with or without categories; appointments for a clinic/salon or general bookings), chosen by keywords. It is for testing, not analysis.
+- The scope guard is keyword-based. It can miss unusual phrasings, and the LLM is the first line of defence. It is tuned to avoid flagging CRUD data such as a `payment_status` field, a library "checkout", "log in my hours", a list of "collaborators" or a "sign-up sheet". When a CRUD idea also asks for out-of-scope features and the mock does not know the domain, it asks clarification questions instead of rejecting.
 - `feedback` (revision after user review) is only used in LLM mode.
-- The contract is a proposal until the team approves it (see the open points in `CONTRACT.md`).
+- The backend does not call the agent yet, and it expects `prompt` instead of `idea` (see "For the backend").
+- The contract is a proposal until the team approves it. Open decisions (single vs multi-entity, approval storage, system fields, localStorage key naming, enum labels, API naming) are listed in [`contract/INTEGRATION.md`](contract/INTEGRATION.md) §4; none of them is resolved.

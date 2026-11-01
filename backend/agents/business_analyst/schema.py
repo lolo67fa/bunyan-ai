@@ -127,7 +127,27 @@ class EntityField(_Model):
             raise ValueError(f"min_value/max_value are only allowed on numeric fields ('{self.name}')")
         if v.date_constraint and self.type not in _DATE_TYPES:
             raise ValueError(f"date_constraint is only allowed on date fields ('{self.name}')")
+        if self.default is not None and self.type != "enum":
+            self._check_default()
         return self
+
+    def _check_default(self) -> None:
+        """The default must be a value the generated form could save."""
+        value, v = self.default, self.validation
+        if self.type in _NUMBER_TYPES:
+            is_number = isinstance(value, (int, float)) and not isinstance(value, bool)
+            if not is_number or (self.type == "integer" and not float(value).is_integer()):
+                kind = "an integer" if self.type == "integer" else "a number"
+                raise ValueError(f"default of '{self.name}' must be {kind}")
+            if (v.min_value is not None and value < v.min_value) or (v.max_value is not None and value > v.max_value):
+                raise ValueError(f"default of '{self.name}' is outside its min_value/max_value")
+        elif self.type == "boolean":
+            if not isinstance(value, bool):
+                raise ValueError(f"default of '{self.name}' must be true or false")
+        elif self.type == "reference":
+            raise ValueError(f"reference field '{self.name}' cannot have a default")
+        elif not isinstance(value, str):
+            raise ValueError(f"default of '{self.name}' must be a string")
 
 
 class OperationSpec(_Model):
@@ -316,12 +336,19 @@ class RequirementsDocument(_Model):
         for r in self.functional_requirements:
             if r.entity is not None and r.entity not in entity_names:
                 raise ValueError(f"{r.id} references unknown entity '{r.entity}'")
+        fr_entity = {r.id: r.entity for r in self.functional_requirements}
         for s in self.user_stories:
             if s.entity is not None and s.entity not in entity_names:
                 raise ValueError(f"{s.id} references unknown entity '{s.entity}'")
+            if s.operation is not None and s.entity is None:
+                raise ValueError(f"{s.id} has an operation but no entity")
             missing = [rid for rid in s.requirement_ids if rid not in fr_ids]
             if missing:
                 raise ValueError(f"{s.id} references unknown requirements {missing}")
+            # Requirements without an entity (e.g. persistence) may support any story.
+            foreign = [rid for rid in s.requirement_ids if fr_entity[rid] not in (None, s.entity)]
+            if s.entity is not None and foreign:
+                raise ValueError(f"{s.id} is about '{s.entity}' but references requirements of other entities {foreign}")
         for a in self.acceptance_criteria:
             if a.story_id not in story_ids:
                 raise ValueError(f"{a.id} references unknown user story '{a.story_id}'")
@@ -334,16 +361,28 @@ class RequirementsDocument(_Model):
         elif self.status == "rejected_out_of_scope":
             if not self.out_of_scope:
                 raise ValueError("status 'rejected_out_of_scope' requires at least one out_of_scope item")
+            # Nothing from a rejected idea may reach the Architect.
+            leftovers = [name for name in ("entities", "functional_requirements", "user_stories", "acceptance_criteria")
+                         if getattr(self, name)]
+            if leftovers:
+                raise ValueError(f"status 'rejected_out_of_scope' must not contain {leftovers}")
         return self
 
     def _check_ready(self) -> None:
         blocking = [q.id for q in self.clarification_questions if q.blocking]
         if blocking:
             raise ValueError(f"status 'ready_for_review' is not allowed with blocking questions {blocking}")
+        # An optional question in a finished document must say what was assumed instead.
+        undecided = [q.id for q in self.clarification_questions if not q.suggested_default]
+        if undecided:
+            raise ValueError(f"optional questions {undecided} need a suggested_default in a 'ready_for_review' document")
         if not self.entities:
             raise ValueError("status 'ready_for_review' requires at least one entity")
         if not any(len(e.crud.enabled_operations()) == 4 for e in self.entities):
             raise ValueError("at least one entity must support all four CRUD operations")
+        no_columns = [e.name for e in self.entities if not e.crud.read.list_fields]
+        if no_columns:
+            raise ValueError(f"crud.read.list_fields is empty for {no_columns}; the list view needs columns")
         covered = {(r.entity, r.category) for r in self.functional_requirements}
         for e in self.entities:
             for op in e.crud.enabled_operations():
@@ -371,18 +410,73 @@ class RequirementsDocument(_Model):
         return [a for a in self.acceptance_criteria if a.story_id == story_id]
 
 
-class AnalystInput(_Model):
-    """Input contract of the Business Analyst Agent (what the orchestrator or CLI passes in)."""
+MAX_IDEA_LENGTH = 4000      # the frontend allows 2000; the margin covers other callers
+MAX_ANSWERS = 20
+MAX_ANSWER_LENGTH = 1000
+MAX_FEEDBACK_LENGTH = 2000
 
-    idea: str = Field(min_length=3, description="Application idea in Arabic or English.")
+
+class AnalystInput(_Model):
+    """Input contract of the Business Analyst Agent (what the orchestrator or CLI passes in).
+
+    ``idea`` is the canonical field name. ``prompt`` is accepted as a deprecated alias
+    only because the current FastAPI skeleton (``backend/schemas/contracts.py``) uses it;
+    it is mapped to ``idea`` and never appears in the output.
+    """
+
+    idea: str = Field(min_length=3, max_length=MAX_IDEA_LENGTH, description="Application idea in Arabic or English.")
     answers: Dict[str, str] = Field(
         default_factory=dict,
-        description="Answers to earlier clarification questions, keyed by question id (Q-1) or question text.",
+        description=(
+            "Answers to earlier clarification questions, keyed by question id (Q-1) or question text. "
+            "Blank answers are dropped (treated as unanswered)."
+        ),
     )
     feedback: Optional[str] = Field(
-        default=None, description="User feedback from the approval step; asks the agent to revise."
+        default=None,
+        max_length=MAX_FEEDBACK_LENGTH,
+        description="User feedback from the approval step; asks the agent to revise.",
     )
     title: Optional[str] = Field(default=None, description="Optional label for sample files; ignored by the agent.")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _legacy_prompt_alias(cls, data: Any) -> Any:
+        if isinstance(data, dict) and "prompt" in data:
+            data = dict(data)
+            prompt = data.pop("prompt")
+            if "idea" in data and data["idea"] != prompt:
+                raise ValueError("send the idea once: 'idea' and the deprecated 'prompt' differ")
+            data.setdefault("idea", prompt)
+        return data
+
+    @field_validator("idea")
+    @classmethod
+    def _idea_has_words(cls, value: str) -> str:
+        if not any(ch.isalpha() for ch in value):
+            raise ValueError("idea must describe the application in words (Arabic or English)")
+        return value
+
+    @field_validator("answers")
+    @classmethod
+    def _clean_answers(cls, value: Dict[str, str]) -> Dict[str, str]:
+        if len(value) > MAX_ANSWERS:
+            raise ValueError(f"at most {MAX_ANSWERS} answers are accepted")
+        cleaned: Dict[str, str] = {}
+        for key, answer in value.items():
+            key, answer = key.strip(), answer.strip()
+            if not key:
+                raise ValueError("every answer needs a question id (e.g. 'Q-1') or the question text as its key")
+            if len(answer) > MAX_ANSWER_LENGTH:
+                raise ValueError(f"answer to '{key}' is longer than {MAX_ANSWER_LENGTH} characters")
+            if answer:
+                cleaned[key] = answer
+        return cleaned
+
+    @field_validator("feedback")
+    @classmethod
+    def _blank_feedback_is_none(cls, value: Optional[str]) -> Optional[str]:
+        return value or None
 
 
 def _require_unique(kind: str, values: List[str]) -> None:

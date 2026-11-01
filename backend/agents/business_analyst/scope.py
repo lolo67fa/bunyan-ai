@@ -31,7 +31,14 @@ class ScopeRule:
 RULES: Tuple[ScopeRule, ...] = (
     ScopeRule(
         category="authentication",
-        en_patterns=(r"log ?in", r"sign ?in", r"sign ?up", r"password", r"user accounts?", r"authenticat\w*",
+        # "log in" / "sign in" / "sign up" also describe CRUD data ("log in my hours", a visitor
+        # "sign-in sheet"), so they only count next to an account context.
+        en_patterns=(r"login", r"signin", r"signup",
+                     r"(log|sign) ?in (page|screen|form|system|with|using|to (the |my |their )?(app|account|site|system))",
+                     r"sign ?up (page|screen|form|with|using|for (an )?accounts?)",
+                     r"(users?|employees?|staff|customers?|members?|admins?|everyone) (can |must |should |will |to )?(log|sign) ?in",
+                     r"(create|register) (an |user |their )?accounts?",
+                     r"password", r"user accounts?", r"authenticat\w*",
                      r"roles? and permissions", r"admin (panel|accounts?)", r"oauth", r"two[- ]factor"),
         ar_patterns=("تسجيل الدخول", "تسجيل دخول", "كلمة المرور", "كلمة مرور", "حسابات المستخدمين",
                      "إنشاء حساب", "انشاء حساب", "صلاحيات"),
@@ -66,8 +73,12 @@ RULES: Tuple[ScopeRule, ...] = (
     ),
     ScopeRule(
         category="realtime_collaboration",
-        en_patterns=(r"real[- ]time (collaboration|chat|sync\w*)", r"live chat", r"chat with", r"multi[- ]?user", r"share [\w ]{0,20}?with (my |the |other )?(team|users|colleagues|friends|family)",
-                     r"collaborat\w*", r"sync(ed|hroni[sz]ed)? across devices"),
+        # A "chat with clients" note or a list of "collaborators" is CRUD data; only chat features
+        # and collaboration between users are flagged.
+        en_patterns=(r"real[- ]time (collaboration|chat|sync\w*)", r"(live|group|in[- ]app) chat",
+                     r"chat (feature|room|system|function\w*)", r"chat with (each other|other users|my team|the team)",
+                     r"multi[- ]?user", r"share [\w ]{0,20}?with (my |the |other )?(team|users|colleagues|friends|family)",
+                     r"collaborat(e|es|ing|ion|ive)", r"sync(ed|hroni[sz]ed)? across devices"),
         ar_patterns=("تعاون في الوقت الفعلي", "محادثة مباشرة", "دردشة", "عدة مستخدمين", "مشاركة مع الفريق",
                      "مزامنة بين الأجهزة"),
         feature={"en": "Multi-user / real-time collaboration", "ar": "التعاون بين عدة مستخدمين في الوقت الفعلي"},
@@ -129,6 +140,16 @@ def _matching_rules(text: str) -> List[Tuple[ScopeRule, str]]:
         if match is not None:
             hits.append((rule, match))
     return hits
+
+
+def remove_out_of_scope_mentions(text: str) -> str:
+    """Return ``text`` without the phrases the guard flags (to see what CRUD content is left)."""
+    for rule, regexes in _COMPILED:
+        for r in regexes:
+            text = r.sub(" ", text)
+        for p in rule.ar_patterns:
+            text = text.replace(p, " ")
+    return text
 
 
 def detect_out_of_scope(text: str, language: str = "en") -> List[OutOfScopeItem]:

@@ -7,8 +7,13 @@ LLM would. The result then goes through exactly the same parsing, scope guard
 and Pydantic validation as a real LLM answer, which lets you test the contract
 and the pipeline without API calls or cost.
 
-Ideas that match no domain produce ``needs_clarification`` (or
-``rejected_out_of_scope`` when they only ask for out-of-scope features).
+Two domains have a simpler variant that is used unless the idea asks for more:
+inventory without categories (one ``Product`` entity) and bookings without a
+clinic/salon context (one ``Booking`` entity), so the mock does not invent
+entities or business rules the user never mentioned.
+
+Ideas that match no domain produce ``needs_clarification``, or
+``rejected_out_of_scope`` when nothing but out-of-scope features is asked for.
 """
 
 from __future__ import annotations
@@ -18,7 +23,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
-from .scope import detect_out_of_scope
+from .scope import detect_out_of_scope, remove_out_of_scope_mentions
 
 L = Dict[str, str]  # {"en": ..., "ar": ...}
 
@@ -61,6 +66,8 @@ class ExtraRule:
     given: L
     when: L
     then: L
+    category: str = "validation"   # requirement / criterion category
+    operation: str = "create"      # user story the rule belongs to
 
 
 @dataclass
@@ -329,7 +336,175 @@ APPOINTMENT_BOOKING = DomainSpec(
     ],
 )
 
+# Variant of INVENTORY_MANAGER for ideas that do not ask for categories: one entity only,
+# so the mock does not invent a Category entity the user never mentioned.
+PRODUCT_INVENTORY = DomainSpec(
+    key="product_inventory",
+    keywords_en=(),
+    keywords_ar=(),
+    app_name={"en": "Inventory Manager", "ar": "مدير المخزون"},
+    description={
+        "en": "A web app for a small shop to record products with their quantities and prices, and to edit and delete them.",
+        "ar": "تطبيق ويب لمتجر صغير لتسجيل المنتجات مع كمياتها وأسعارها وتعديلها وحذفها.",
+    },
+    role={"en": "shop owner", "ar": "صاحب المتجر"},
+    target_users={"en": ["Small shop owners", "Store keepers"], "ar": ["أصحاب المتاجر الصغيرة", "أمناء المستودعات"]},
+    entities=[
+        EntitySpec(
+            name="Product",
+            label={"en": "Product", "ar": "منتج"},
+            plural={"en": "Products", "ar": "المنتجات"},
+            description={"en": "A product kept in stock.", "ar": "منتج موجود في المخزون."},
+            display_field="name",
+            fields=[
+                FieldSpec("name", {"en": "Product name", "ar": "اسم المنتج"}, "string", True,
+                          sample={"en": "Mineral water 330ml", "ar": "مياه معدنية 330 مل"},
+                          validation={"min_length": 2, "max_length": 100},
+                          invalid={"en": "the 1-character value \"W\"", "ar": "القيمة \"م\" المكونة من حرف واحد"}),
+                FieldSpec("quantity", {"en": "Quantity", "ar": "الكمية"}, "integer", True, default=0,
+                          sample={"en": "24", "ar": "24"},
+                          validation={"min_value": 0},
+                          invalid={"en": "the value -1", "ar": "القيمة -1"}),
+                FieldSpec("price", {"en": "Price", "ar": "السعر"}, "decimal", True,
+                          sample={"en": "2.50", "ar": "2.50"},
+                          validation={"min_value": 0},
+                          invalid={"en": "the value -5", "ar": "القيمة -5"}),
+            ],
+            list_fields=["name", "quantity", "price"],
+            search_fields=["name"],
+            filter_fields=[],
+            sort_field="name",
+        )
+    ],
+    assumptions={
+        "en": ["Stock movements (purchases/sales history) are not tracked; the user edits the quantity directly.",
+               "Prices are plain numbers; the currency is not stored."],
+        "ar": ["لا يتم تتبع حركات المخزون (سجل المشتريات والمبيعات)؛ يعدّل المستخدم الكمية مباشرة.",
+               "الأسعار أرقام فقط ولا يتم حفظ العملة."],
+    },
+    optional_questions=[
+        {"en": "Do you want to group products into categories?",
+         "ar": "هل تريد تصنيف المنتجات ضمن فئات؟",
+         "reason_en": "Categories would add a second entity.",
+         "reason_ar": "إضافة الفئات تعني كياناً ثانياً.",
+         "default_en": "No categories in the first version.", "default_ar": "بدون فئات في النسخة الأولى."},
+        {"en": "Should the list highlight products whose quantity is low?",
+         "ar": "هل تريد تمييز المنتجات التي قلّت كميتها في القائمة؟",
+         "reason_en": "A low-stock alert needs a threshold per product.",
+         "reason_ar": "تنبيه انخفاض المخزون يحتاج إلى حد لكل منتج.",
+         "default_en": "No low-stock highlight in the first version.",
+         "default_ar": "بدون تمييز لانخفاض المخزون في النسخة الأولى."},
+    ],
+)
+
+# Variant of APPOINTMENT_BOOKING for general bookings with no clinic/salon context: no service
+# list, no duration and no double-booking rule, because the user did not specify them.
+BOOKING = DomainSpec(
+    key="booking",
+    keywords_en=(),
+    keywords_ar=(),
+    app_name={"en": "Booking Manager", "ar": "إدارة الحجوزات"},
+    description={
+        "en": "A simple web app to add, view, edit and cancel bookings with the customer's name, date, time and status.",
+        "ar": "تطبيق ويب بسيط لإضافة الحجوزات وعرضها وتعديل مواعيدها وإلغائها مع اسم العميل والتاريخ والوقت والحالة.",
+    },
+    role={"en": "booking manager", "ar": "مسؤول الحجوزات"},
+    target_users={"en": ["Small business owners", "Receptionists"], "ar": ["أصحاب الأعمال الصغيرة", "موظفو الاستقبال"]},
+    entities=[
+        EntitySpec(
+            name="Booking",
+            label={"en": "Booking", "ar": "حجز"},
+            plural={"en": "Bookings", "ar": "الحجوزات"},
+            description={"en": "A reservation made for a customer at a date and time.",
+                         "ar": "حجز لعميل في تاريخ ووقت محددين."},
+            display_field="customer_name",
+            fields=[
+                FieldSpec("customer_name", {"en": "Customer name", "ar": "اسم العميل"}, "string", True,
+                          sample={"en": "Sara Ahmed", "ar": "سارة أحمد"},
+                          validation={"min_length": 2, "max_length": 100},
+                          invalid={"en": "the 1-character value \"S\"", "ar": "القيمة \"س\" المكونة من حرف واحد"}),
+                FieldSpec("date", {"en": "Date", "ar": "التاريخ"}, "date", True,
+                          sample={"en": "a date 3 days from today", "ar": "تاريخ بعد 3 أيام من اليوم"},
+                          validation={"date_constraint": "not_in_past"},
+                          invalid={"en": "yesterday's date", "ar": "تاريخ الأمس"}),
+                FieldSpec("time", {"en": "Time", "ar": "الوقت"}, "time", True,
+                          sample={"en": "10:30", "ar": "10:30"}),
+                FieldSpec("status", {"en": "Booking status", "ar": "حالة الحجز"}, "enum", True,
+                          sample={"en": "confirmed", "ar": "مؤكد"},
+                          enum_values={"en": ["confirmed", "cancelled"], "ar": ["مؤكد", "ملغى"]},
+                          default_index=0),
+                FieldSpec("notes", {"en": "Notes", "ar": "ملاحظات"}, "text", False,
+                          sample={"en": "Table for two", "ar": "طاولة لشخصين"},
+                          validation={"max_length": 500},
+                          invalid={"en": "a text of 501 characters", "ar": "نصاً من 501 حرف"}),
+            ],
+            list_fields=["customer_name", "date", "time", "status"],
+            search_fields=["customer_name"],
+            filter_fields=["status", "date"],
+            sort_field="date",
+        )
+    ],
+    extra_rules=[
+        ExtraRule(
+            entity="Booking",
+            category="update",
+            operation="update",
+            requirement={
+                "en": "The system shall let the user cancel a Booking by setting its status to \"cancelled\"; the cancelled Booking stays in the list.",
+                "ar": "يجب أن يسمح النظام للمستخدم بإلغاء الحجز بتغيير حالته إلى \"ملغى\" مع بقاء الحجز الملغى في القائمة.",
+            },
+            given={"en": "a Booking for \"Sara Ahmed\" exists with status \"confirmed\"",
+                   "ar": "يوجد حجز باسم \"سارة أحمد\" حالته \"مؤكد\""},
+            when={"en": "the user changes its status to \"cancelled\" and clicks \"Save\"",
+                  "ar": "يغير المستخدم حالته إلى \"ملغى\" ويضغط \"حفظ\""},
+            then={"en": "the list still shows the Booking for \"Sara Ahmed\" with status \"cancelled\"",
+                  "ar": "يبقى حجز \"سارة أحمد\" ظاهراً في القائمة وحالته \"ملغى\""},
+        ),
+    ],
+    assumptions={
+        "en": ["A booking stores only a start date and time; it has no duration.",
+               "Cancelling keeps the booking with status \"cancelled\"; Delete removes it permanently."],
+        "ar": ["يحفظ الحجز تاريخ ووقت البداية فقط دون مدة.",
+               "الإلغاء يُبقي الحجز بحالة \"ملغى\"، أما الحذف فيزيله نهائياً."],
+    },
+    optional_questions=[
+        {"en": "When you cancel a booking, should it be deleted or kept with the status \"cancelled\"?",
+         "ar": "عند إلغاء الحجز، هل يُحذف نهائياً أم يبقى بحالة \"ملغى\"؟",
+         "reason_en": "\"Cancel\" can mean a status change or a delete.",
+         "reason_ar": "كلمة \"إلغاء\" قد تعني تغيير الحالة أو الحذف.",
+         "default_en": "Keep it with the status \"cancelled\"; Delete is still available.",
+         "default_ar": "يبقى بحالة \"ملغى\" مع إمكانية الحذف."},
+        {"en": "Can two bookings have the same date and time?",
+         "ar": "هل يمكن أن يكون لحجزين نفس التاريخ والوقت؟",
+         "reason_en": "Defines whether the app must block overlapping bookings.",
+         "reason_ar": "يحدد هل يجب أن يمنع التطبيق تعارض الحجوزات.",
+         "default_en": "Allowed; the first version does not check for overlapping bookings.",
+         "default_ar": "مسموح؛ النسخة الأولى لا تتحقق من تعارض الحجوزات."},
+        {"en": "Do you also need the customer's phone number or what is being booked (a table, a room, a service)?",
+         "ar": "هل تحتاج أيضاً إلى رقم جوال العميل أو نوع الشيء المحجوز (طاولة، غرفة، خدمة)؟",
+         "reason_en": "Only the customer name, date, time and status were mentioned.",
+         "reason_ar": "لم يُذكر إلا اسم العميل والتاريخ والوقت والحالة.",
+         "default_en": "Customer name, date, time, status and optional notes only.",
+         "default_ar": "اسم العميل والتاريخ والوقت والحالة وملاحظات اختيارية فقط."},
+    ],
+)
+
 DOMAINS: Tuple[DomainSpec, ...] = (TASK_MANAGER, INVENTORY_MANAGER, APPOINTMENT_BOOKING)
+
+# Words that select the richer variant of a domain. Without them the simpler variant is used.
+_CATEGORY_WORDS_EN = ("category", "categories", "categorise", "categorize")
+_CATEGORY_WORDS_AR = ("فئة", "الفئة", "فئات", "الفئات", "تصنيف", "التصنيف", "تصنيفات")
+_SERVICE_WORDS_EN = ("clinic", "salon", "dental", "dentist", "doctor", "patient", "patients", "barber", "spa",
+                     "service", "services")
+_SERVICE_WORDS_AR = ("عيادة", "العيادة", "صالون", "مريض", "المرضى", "مرضى", "طبيب", "الطبيب", "أسنان", "حلاق",
+                     "خدمة", "الخدمة", "خدمات")
+
+# Verbs that show the user wants to manage records (used to tell a CRUD idea with some
+# out-of-scope extras from an idea that is only out-of-scope features).
+_CRUD_INTENT_EN = re.compile(r"\b(add|adding|create|edit|editing|update|delete|remove|record|records|track|"
+                             r"tracking|list|store|save|view|keep)\b", re.IGNORECASE)
+_CRUD_INTENT_AR = ("أضيف", "اضيف", "إضافة", "اضافة", "أعدل", "اعدل", "تعديل", "أحذف", "احذف", "حذف",
+                   "أعرض", "اعرض", "عرض", "أسجل", "اسجل", "أتابع", "اتابع", "متابعة", "قائمة", "أحفظ", "احفظ", "حفظ")
 
 COMMON_ASSUMPTIONS = {
     "en": ["The app is used by one person in one browser; data is stored in localStorage.",
@@ -493,7 +668,27 @@ def _match_domain(text: str) -> Optional[DomainSpec]:
         hits += sum(1 for k in domain.keywords_ar if k in text)
         if hits > best_hits:
             best, best_hits = domain, hits
-    return best
+    return _select_variant(best, text) if best else None
+
+
+def _mentions(text: str, words_en: Tuple[str, ...], words_ar: Tuple[str, ...]) -> bool:
+    lowered = text.lower()
+    return any(_has_word(lowered, w) for w in words_en) or any(w in text for w in words_ar)
+
+
+def _select_variant(domain: DomainSpec, text: str) -> DomainSpec:
+    """Use the simpler template unless the idea asks for what the richer one adds."""
+    if domain is INVENTORY_MANAGER and not _mentions(text, _CATEGORY_WORDS_EN, _CATEGORY_WORDS_AR):
+        return PRODUCT_INVENTORY
+    if domain is APPOINTMENT_BOOKING and not _mentions(text, _SERVICE_WORDS_EN, _SERVICE_WORDS_AR):
+        return BOOKING
+    return domain
+
+
+def _has_crud_intent(text: str) -> bool:
+    """True when ``text`` (with out-of-scope phrases removed) still asks to manage records."""
+    rest = remove_out_of_scope_mentions(text)
+    return _CRUD_INTENT_EN.search(rest) is not None or any(w in rest for w in _CRUD_INTENT_AR)
 
 
 def _has_word(text: str, word: str) -> bool:
@@ -595,8 +790,11 @@ def _build_entity(b: _Builder, domain: DomainSpec, e: EntitySpec) -> None:
     fr_update = b.fr(e.name, "update", T["fr_update"][lang].format(label=label, plural=plural))
     fr_delete = b.fr(e.name, "delete", T["fr_delete"][lang].format(label=label))
     fr_valid = b.fr(e.name, "validation", T["fr_validation"][lang].format(label=label, rules=_rules_text(e, lang)))
-    extra_frs = [(rule, b.fr(e.name, "validation", rule.requirement[lang]))
+    extra_frs = [(rule, b.fr(e.name, rule.category, rule.requirement[lang]))
                  for rule in domain.extra_rules if rule.entity == e.name]
+
+    def extras(op: str) -> List[Tuple[ExtraRule, str]]:
+        return [(rule, rid) for rule, rid in extra_frs if rule.operation == op]
 
     def story(op: str, reqs: List[str]) -> str:
         goal, benefit = T["story"][op][lang]
@@ -605,7 +803,7 @@ def _build_entity(b: _Builder, domain: DomainSpec, e: EntitySpec) -> None:
     base = {"label": label, "plural": plural, "display": display, "field": display_f.label[lang]}
 
     # Create
-    s = story("create", [fr_create, fr_valid] + [rid for _, rid in extra_frs])
+    s = story("create", [fr_create, fr_valid] + [rid for _, rid in extras("create")])
     required = [f for f in e.fields if f.required]
     values = SEP[lang].join(f"{f.label[lang]} = \"{f.sample[lang]}\"" for f in required)
     b.ac(s, "create", AC["create"][lang], **base, values=values)
@@ -615,8 +813,8 @@ def _build_entity(b: _Builder, domain: DomainSpec, e: EntitySpec) -> None:
             b.ac(s, "validation", AC["invalid"][lang], **{**base, "invalid": f.invalid[lang], "field": f.label[lang]})
         if f.unique:
             b.ac(s, "validation", AC["unique"][lang], **{**base, "field": f.label[lang], "value": f.sample[lang]})
-    for rule, _ in extra_frs:
-        b.ac(s, "validation", (rule.given[lang], rule.when[lang], rule.then[lang]))
+    for rule, _ in extras("create"):
+        b.ac(s, rule.category, (rule.given[lang], rule.when[lang], rule.then[lang]))
     b.ac(s, "persistence", AC["persist"][lang], **base)
 
     # Read
@@ -627,9 +825,11 @@ def _build_entity(b: _Builder, domain: DomainSpec, e: EntitySpec) -> None:
         b.ac(s, "read", AC["search"][lang], **base)
 
     # Update
-    s = story("update", [fr_update, fr_valid])
+    s = story("update", [fr_update, fr_valid] + [rid for _, rid in extras("update")])
     b.ac(s, "update", AC["update"][lang], **base)
     b.ac(s, "validation", AC["update_invalid"][lang], **base)
+    for rule, _ in extras("update"):
+        b.ac(s, rule.category, (rule.given[lang], rule.when[lang], rule.then[lang]))
 
     # Delete
     s = story("delete", [fr_delete])
@@ -742,8 +942,9 @@ def mock_generate(idea: str, language: str, answers: Optional[Dict[str, str]] = 
     domain = _match_domain(text)
     if domain is not None:
         doc = _ready_document(domain, idea, language, out_of_scope)
-    elif out_of_scope:
+    elif out_of_scope and not _has_crud_intent(text):
         doc = _rejected_document(idea, language, out_of_scope)
     else:
+        # Unknown domain, or a CRUD idea with out-of-scope extras: ask instead of rejecting.
         doc = _clarification_document(idea, language, out_of_scope)
     return json.dumps(doc, ensure_ascii=False, indent=2)

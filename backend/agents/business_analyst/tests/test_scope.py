@@ -48,6 +48,40 @@ def test_guard_does_not_flag_plain_crud_ideas(text):
     assert detect_out_of_scope(text, lang) == []
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        "A timesheet where I log in my hours per project",             # 'log in' = record
+        "Track my project collaborators and their roles",              # a list of people
+        "Notes of what we said when I chat with clients",              # a record of a conversation
+        "An event sign-up sheet where I add attendees",                # sign-up sheet = records
+        "A visitor sign in sheet with name and arrival time",
+        "Show stock totals in real time on the inventory list",        # 'real time' display
+        "متجر بسيط أسجل فيه المنتجات وتاريخ انتهاء الصلاحية",           # 'الصلاحية' = expiry
+    ],
+)
+def test_crud_wording_is_not_mistaken_for_out_of_scope(text):
+    lang = "ar" if any("؀" <= c <= "ۿ" for c in text) else "en"
+    assert detect_out_of_scope(text, lang) == []
+
+
+@pytest.mark.parametrize(
+    "text, category",
+    [
+        ("Employees log in to the app before adding orders", "authentication"),
+        ("Add a login page", "authentication"),
+        ("Users sign up with their email", "authentication"),
+        ("Customers can create an account", "authentication"),
+        ("Sign in with Google", "authentication"),
+        ("Add a live chat for customers", "realtime_collaboration"),
+        ("The team can collaborate on the list", "realtime_collaboration"),
+        ("Users chat with each other", "realtime_collaboration"),
+    ],
+)
+def test_narrowed_patterns_still_catch_real_requests(text, category):
+    assert category in {i.category for i in detect_out_of_scope(text, "en")}
+
+
 def test_mixed_idea_keeps_crud_core_and_flags_extras(sample_input):
     doc = analyze(sample_input("appointment_booking_en")["idea"], mode="mock")
     assert doc.status == "ready_for_review"

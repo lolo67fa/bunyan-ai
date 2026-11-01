@@ -23,14 +23,18 @@
 }
 ```
 
-| Field | Type | Required | Meaning |
-|---|---|---|---|
-| `idea` | string (min 3 chars) | yes | The application idea, in **Arabic or English**. |
-| `answers` | object string → string | no | Answers to earlier clarification questions, keyed by question id (`Q-1`) or question text. Send them with the **same** `idea` to get a revised document. |
-| `feedback` | string | no | Change requests from the user approval step (LLM mode only). |
-| `title` | string | no | Label for sample files; ignored by the agent. |
+| Field | Type | Required | Rules | Meaning |
+|---|---|---|---|---|
+| `idea` | string | yes | trimmed; 3 to 4000 characters; must contain letters (Arabic or Latin) | The application idea, in **Arabic or English** (mixed is fine). |
+| `answers` | object string → string | no | at most 20 entries, each answer at most 1000 characters; keys must not be blank; **blank answers are dropped** (treated as unanswered) | Answers to earlier clarification questions, keyed by question id (`Q-1`) or question text. Send them with the **same** `idea` to get a revised document. |
+| `feedback` | string | no | at most 2000 characters; blank becomes `null` | Change requests from the user approval step (LLM mode only). |
+| `title` | string | no | | Label for sample files; ignored by the agent. |
 
-Python API: `analyze(idea, answers=None, feedback=None, mode=None) -> RequirementsDocument`.
+Unknown keys are rejected, with one exception: **`prompt` is accepted as a deprecated alias of `idea`** because the current FastAPI skeleton (`backend/schemas/contracts.py`, commit `4260ceb`) uses that name. It is mapped to `idea`; sending both with different values is an error. **`idea` is the canonical name** (the frontend already sends it, see `frontend/src/api/httpClient.js`). The alias will be removed once the backend sends `idea` (proposed patch: [`INTEGRATION.md`](INTEGRATION.md) §2.3).
+
+The 4000-character limit is above the frontend's own limit (2000, `frontend/src/pages/IdeaPage.jsx`), so anything the frontend accepts is accepted here.
+
+Python API (unchanged): `analyze(idea, answers=None, feedback=None, mode=None) -> RequirementsDocument`, or `analyze_input(AnalystInput.model_validate(payload))` for a JSON payload.
 
 ## 2. Output: `requirements.json` (`RequirementsDocument`)
 
@@ -84,7 +88,11 @@ Top level:
 | `needs_clarification` | At least one **blocking** question. Entities may be empty or partial. | Show the questions, collect answers, call the agent again with `answers`. | Do not run. |
 | `rejected_out_of_scope` | Nothing CRUD remains after removing out-of-scope features. | Show `out_of_scope` reasons and the suggested alternative question. | Do not run. |
 
-Approval is recorded by the orchestrator, not in this document.
+Approval is recorded by the orchestrator, not in this document. The agent never starts the Architect itself.
+
+**These are Business Analyst statuses, not project workflow states.** The orchestrator owns the workflow (`analyzing`, `awaiting_clarification`, `awaiting_approval`, `designing`, ... in `docs/architecture.md` §6) and maps the BA status onto it; it should not copy `status` into the project's status field. Suggested mapping (Alanoud's decision): `needs_clarification` → `awaiting_clarification`, `ready_for_review` → `awaiting_approval`, `rejected_out_of_scope` → `failed` (or a dedicated state, open point F2 in `frontend/README.md`).
+
+Transitions: `needs_clarification` + answers → any status (unhelpful or blank answers keep `needs_clarification`); `rejected_out_of_scope` + answers that describe records to manage → `ready_for_review` or `needs_clarification`, with the unsupported features still listed in `out_of_scope`; `ready_for_review` + feedback (LLM mode) → a revised document.
 
 ## 4. Guarantees (enforced by validation, so consumers can rely on them)
 
@@ -92,15 +100,18 @@ Every document the agent returns has passed these checks; an LLM answer that fai
 
 1. JSON matches the schema; unknown keys are rejected.
 2. IDs are unique and well-formed; every cross-reference resolves: story→requirements, criterion→story, requirement/story→entity, reference field→entity, `display_field` / list / search / filter / sort fields→fields of the entity.
-3. Field rules fit the type (no `min_value` on text, enums have values, etc.).
+3. Field rules fit the type (no `min_value` on text, enums have values, etc.). A `default` is a valid value of the field: a number (integer for `integer`) inside `min_value`/`max_value`, `true`/`false` for `boolean`, one of `enum_values` for `enum`, a string for text/date types, and never set on a `reference`.
 4. Every entity supports at least create and read.
-5. When `ready_for_review`:
+5. A user story with an `operation` names its `entity`, and only references requirements of that entity (or entity-free requirements such as persistence).
+6. When `ready_for_review`:
    - at least one entity, and at least one entity supports all four CRUD operations;
    - every enabled operation of every entity has at least one functional requirement **and** one user story;
    - every user story has at least one acceptance criterion;
-   - no blocking questions remain.
-6. Acceptance criteria are Given/When/Then; `then` may not contain vague words (fast, easy, user-friendly, intuitive, properly, سهل, سريع ...).
-7. **CRUD scope:** no requirement, story, criterion or field describes authentication, payment processing, native mobile apps, a custom server/database, real-time multi-user features, enterprise systems, messaging/third-party integrations or file uploads. A deterministic guard also adds any such feature mentioned in the idea to `out_of_scope` if the analyst missed it.
+   - every entity's `crud.read.list_fields` names at least one column;
+   - no blocking questions remain, and every optional question has a `suggested_default` (the value that was assumed).
+7. When `rejected_out_of_scope`: at least one `out_of_scope` item with a reason, and **no** entities, requirements, stories or criteria, so nothing from a rejected idea can reach the Architect.
+8. Acceptance criteria are Given/When/Then; `then` may not contain vague words (fast, easy, user-friendly, intuitive, properly, سهل, سريع ...).
+9. **CRUD scope:** no requirement, story, criterion or field describes authentication, payment processing, native mobile apps, a custom server/database, real-time multi-user features, enterprise systems, messaging/third-party integrations or file uploads. A deterministic guard also adds any such feature mentioned in the idea to `out_of_scope` if the analyst missed it.
 
 `action: "replaced_with_crud_alternative"` means the CRUD version **is** in the requirements (for example a `payment_status` enum field instead of online payment). `action: "excluded"` means it is simply not built.
 
@@ -139,10 +150,14 @@ Full files: [`../samples/outputs/task_manager_en.requirements.json`](../samples/
 
 ## 6. Open points for team review
 
-1. Should approval be stored inside `requirements.json` (e.g. `approved_at`) or only in the orchestrator's workflow state? (Current proposal: orchestrator only.)
-2. Is a flat `acceptance_criteria` list linked by `story_id` convenient for QA, or does Sara prefer criteria nested inside each story?
-3. Does the Architect want the agent to suggest screens, or should screens stay entirely in `architecture.json`? (Current proposal: Architect only.)
-4. Are the system fields `id`, `created_at`, `updated_at` the right defaults for the CRUD template (Yara)?
+None of these is decided. The full list with owners is in [`INTEGRATION.md`](INTEGRATION.md) §4.
+
+1. **Single entity or several in v0.1?** This contract allows several entities and `reference` fields. The Architect (PR #4, `architecture` `0.2.0-proposal`) accepts exactly one entity with no references. The BA contract is **unchanged** until the team decides (D9).
+2. Should approval be stored inside `requirements.json` (e.g. `approved_at`) or only in the orchestrator's workflow state? (Current proposal: orchestrator only.)
+3. Is a flat `acceptance_criteria` list linked by `story_id` convenient for QA, or does Sara prefer criteria nested inside each story?
+4. Does the Architect want the agent to suggest screens, or should screens stay entirely in `architecture.json`? (Current proposal: Architect only.)
+5. Are the system fields `id`, `created_at`, `updated_at` the right defaults for the CRUD template (Yara)?
+6. Naifah's requests in `backend/agents/architect/contract/CONTRACT.md` §7: English enum identifiers plus `enum_labels`, and `category: "other"` for business rules that `fields[].validation` cannot express. Both change this contract and need agreement before they are implemented.
 
 ## 7. Versioning
 

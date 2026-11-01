@@ -46,6 +46,19 @@ CASES = {
         "status": {"rejected_out_of_scope", "needs_clarification"}, "language": "ar",
         "entity_hint": None, "out_of_scope": {"payments", "native_mobile"},
     },
+    # Evaluation scenarios A-C (docs/development-plan.md, Week 4 evaluation).
+    "scenario_a_task_en": {
+        "status": {"ready_for_review"}, "language": "en",
+        "entity_hint": "task", "out_of_scope": set(),
+    },
+    "scenario_b_inventory_ar": {
+        "status": {"ready_for_review", "needs_clarification"}, "language": "ar",
+        "entity_hint": "product|item", "out_of_scope": set(),
+    },
+    "scenario_c_booking_ar": {
+        "status": {"ready_for_review", "needs_clarification"}, "language": "ar",
+        "entity_hint": "booking|reservation|appointment", "out_of_scope": set(),
+    },
 }
 
 _results = []
