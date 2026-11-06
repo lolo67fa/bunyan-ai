@@ -1,0 +1,96 @@
+# One real LLM analysis by the Business Analyst Agent (owner: Ghala).
+#
+# Manual only: it never runs on push or pull request. Each run makes ONE paid
+# Anthropic request (claude-opus-5-5), after two free pre-flight calls (Models API
+# and token counting) that verify the model and measure the prompt.
+#
+# GitHub only offers "Run workflow" for workflows on the default branch, so this
+# file must be merged into main before it can be started. The Business Analyst
+# code is checked out from the `ba_ref` input (default: feature/ghala-analyst, PR #2).
+name: BA live LLM test (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      ba_ref:
+        description: Branch, tag or commit that contains the Business Analyst code (needs live_check.py)
+        required: true
+        default: feature/ghala-analyst
+      confirm:
+        description: Type RUN-ONE-PAID-CALL to confirm one paid Anthropic request
+        required: true
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ba-live-test
+  cancel-in-progress: false
+
+jobs:
+  live-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      BA_MODE: llm
+      BA_LLM_PROVIDER: anthropic
+      BA_LLM_MODEL: claude-opus-5-5
+      BA_LLM_BACKEND: direct   # Anthropic SDK only, no CrewAI install
+      BA_EFFORT: high
+      BA_MAX_RETRIES: "0"      # no second attempt when the answer fails validation
+      BA_FALLBACKS: "off"      # no server-side fallback to another model on refusal
+      BA_SDK_MAX_RETRIES: "0"  # no SDK transport retries on 429/5xx
+      BA_VERBOSE: "false"
+      PYTHONIOENCODING: utf-8
+    steps:
+      - name: Require confirmation
+        if: inputs.confirm != 'RUN-ONE-PAID-CALL'
+        run: |
+          echo "::error::Confirmation text did not match RUN-ONE-PAID-CALL. No API call was made."
+          exit 1
+
+      - name: Check out the Business Analyst code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ba_ref }}
+          persist-credentials: false
+
+      - name: Check the single-call runner exists
+        run: |
+          if [ ! -f backend/agents/business_analyst/live_check.py ]; then
+            echo "::error::backend/agents/business_analyst/live_check.py not found on '${{ inputs.ba_ref }}'. No API call was made."
+            exit 1
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install the Business Analyst dependencies (direct backend only)
+        run: |
+          python -m pip install --disable-pip-version-check --quiet \
+            -r backend/agents/business_analyst/requirements.txt "anthropic==1.8.0"
+          python -m pip list --disable-pip-version-check | grep -iE "^(anthropic|pydantic) "
+
+      - name: Run one real analysis
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python -m backend.agents.business_analyst.live_check --out live-test-output
+
+      - name: Show the summary on the run page
+        if: always()
+        run: |
+          if [ -f live-test-output/summary.md ]; then
+            cat live-test-output/summary.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload the test summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ba-live-test-${{ github.run_id }}
+          path: live-test-output/
+          if-no-files-found: warn
+          retention-days: 30
