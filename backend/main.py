@@ -105,8 +105,7 @@ def approve_project(project_id: uuid.UUID, data: ApprovalRequest):
         raise HTTPException(status_code=422, detail="Feedback is required when requesting changes")
     project["requirements_approved"] = False
     project["feedback"] = data.feedback
-    return run_analysis(project, feedback=data.feedback)
-
+    return run_analysis(project, answers=project.get("answers"), feedback=data.feedback)
 
 @app.post("/projects/{project_id}/answers")
 def submit_answers(project_id: uuid.UUID, data: AnswersRequest):
