@@ -39,7 +39,7 @@ The page polls `GET /projects/{id}` every `VITE_POLL_MS` ms and stops while the 
   - vague idea → clarification questions → answers → task-manager requirements (same as `samples/answers/vague_idea_answers.json`)
   - payments / mobile app / chat → rejected as out of scope
   - Gulf-dialect inventory → shows one QA failure and one repair attempt
-- `architecture.json`, `test_report.json`, the generated app, `project_plan.md` and `risks.md` are **placeholders** (`src/mocks/placeholders.js`, marked `_mock`) until their owners share real samples.
+- `test_report.json` follows Sara's contract from PR #7. `architecture.json`, the generated app, `project_plan.md` and `risks.md` are **placeholders** (`src/mocks/placeholders.js`, marked `_mock`) until their owners share real samples.
 - Mock runs are stored in `localStorage` (`bunyan.mock.projects.v2`), so a refresh keeps them.
 
 ## API contract
@@ -83,6 +83,20 @@ GET  /projects/{project_id}/download                                           �
 - `approved`: requirements approved, next agent not started yet. The page keeps polling.
 - If an action endpoint returns less than a full `Project` (approve in PR #5), the client re-reads `GET /projects/{project_id}`.
 
+### QA report → `metrics`
+
+The screens do not read `test_report.json` fields directly. The backend builds `Project.metrics` from Sara's report (PR #7, `tests/e2e/contract/TEST_REPORT.md` §4):
+
+```text
+metrics.pass_rate        ← test_report.summary.pass_rate     (number 0..1)
+metrics.checks_passed    ← test_report.summary.passed
+metrics.checks_total     ← test_report.summary.total         (always 8)
+repair_attempt           ← test_report.run.attempt           (0 = first run, 1–2 after repair)
+metrics.run_time_seconds ← orchestrator: whole pipeline, approve → completed
+```
+
+`run_time_seconds` is the whole pipeline (target ≤ 90 s), not `run.duration_ms`, which is the QA run only. The mock `test_report.json` uses Sara's exact shape (8 check ids, descriptions, `status`, `summary`, `run`, `defects`) and passes her Pydantic model `QAReport`.
+
 Errors: FastAPI default `{ "detail": "..." }` (string or validation list). Proposed: a too-short or blank idea returns `422`, not `500`, so the screen can show the message.
 
 ## Open questions
@@ -92,7 +106,7 @@ Errors: FastAPI default `{ "detail": "..." }` (string or validation list). Propo
 | F1 | Approve returns the full `Project`; approve accepts `{ approved: false, feedback }`; `POST /answers`; the proposed fields; `422` for invalid ideas | Alanoud |
 | F4 | Preview origin: the generated app uses `localStorage`, so the iframe needs `allow-same-origin`; it must be served from a different origin than the frontend | Alanoud |
 | F6 | `architecture.json` sample | Naifah |
-| F7 | `test_report.json` format and the list of the 8 core checks | Sara |
+| F7 | Confirm the QA → `metrics` mapping above, and that the orchestrator computes `run_time_seconds` | Sara, Alanoud |
 | F8 | Generated file names (`index.html`, `style.css`, `app.js`) and a sample app for the preview | Yara |
 | F9 | Bunyan visual identity: colours, fonts, wireframes (current styles are temporary) | Naifah |
 

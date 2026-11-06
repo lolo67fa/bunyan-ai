@@ -7,6 +7,7 @@ import { SAMPLES, pickSampleKey, pickSampleAfterAnswers } from '../mocks/samples
 import {
   mockArchitecture,
   mockTestReport,
+  metricsFromReport,
   mockProjectPlan,
   mockRisks,
   mockPreviewHtml,
@@ -150,15 +151,20 @@ function toProject(rec) {
     project.error = { code: 'out_of_scope', message: 'الفكرة خارج نطاق النسخة الأولى (CRUD فقط).' };
   }
   if (step.status === 'completed') {
-    const report = mockTestReport(doc);
-    project.metrics = {
-      pass_rate: report.pass_rate,
-      checks_passed: report.passed,
-      checks_total: report.total,
-      run_time_seconds: Math.round((step.at - rec.approved_at) / 1000),
-    };
+    project.metrics = metricsFromReport(
+      latestReport(rec, project),
+      Math.round((step.at - rec.approved_at) / 1000),
+    );
   }
   return project;
+}
+
+// Latest QA report for this run: in the repair demo the first test (attempt 0) fails,
+// the re-test after the repair (attempt 1) passes.
+function latestReport(rec, project) {
+  const attempt = project.repair_attempt ?? 0;
+  const fail = rec.sampleKey === REPAIR_DEMO_SAMPLE && attempt === 0;
+  return mockTestReport(SAMPLES[rec.sampleKey], { attempt, fail });
 }
 
 // ---------- API ----------
@@ -223,7 +229,7 @@ export async function getArtifactText(id, name) {
     case 'architecture.json':
       return json(mockArchitecture(doc));
     case 'test_report.json':
-      return json(mockTestReport(doc));
+      return json(latestReport(rec, project));
     case 'project_plan.md':
       return mockProjectPlan(project);
     case 'risks.md':
