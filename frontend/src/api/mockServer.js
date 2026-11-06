@@ -12,12 +12,14 @@ import {
   mockPreviewHtml,
 } from '../mocks/placeholders.js';
 
-const STORE_KEY = 'bunyan.mock.projects';
+// v2: projects use "project_id" (PR #5). Old mock runs saved under v1 are ignored.
+const STORE_KEY = 'bunyan.mock.projects.v2';
 const ANALYZE_MS = 2500;
 // Mock repair demo: this sample fails one QA check on the first run, then gets repaired.
 const REPAIR_DEMO_SAMPLE = 'inventory_dialect_ar';
 
 const STEP_MS = {
+  approved: 1000,
   designing: 2500,
   developing: 3000,
   testing: 2500,
@@ -81,7 +83,7 @@ function analysisTimeline(start, sampleKey) {
     doc.status === 'needs_clarification'
       ? 'awaiting_clarification'
       : doc.status === 'rejected_out_of_scope'
-        ? 'failed'
+        ? 'rejected'
         : 'awaiting_approval';
   return [
     { status: 'analyzing', at: start, current_agent: 'business_analyst' },
@@ -92,9 +94,10 @@ function analysisTimeline(start, sampleKey) {
 function buildTimeline(start, sampleKey) {
   const withRepair = sampleKey === REPAIR_DEMO_SAMPLE;
   const steps = withRepair
-    ? ['designing', 'developing', 'testing', 'repairing', 'testing', 'documenting']
-    : ['designing', 'developing', 'testing', 'documenting'];
+    ? ['approved', 'designing', 'developing', 'testing', 'repairing', 'testing', 'documenting']
+    : ['approved', 'designing', 'developing', 'testing', 'documenting'];
   const agentOf = {
+    approved: 'business_analyst',
     designing: 'software_architect',
     developing: 'developer',
     testing: 'qa_tester',
@@ -131,7 +134,7 @@ function toProject(rec) {
   const doc = SAMPLES[rec.sampleKey];
   const analyzed = Boolean(step.analyzed);
   const project = {
-    id: rec.id,
+    project_id: rec.id,
     idea: rec.idea,
     status: step.status,
     current_agent: step.current_agent ?? null,
@@ -143,7 +146,7 @@ function toProject(rec) {
     metrics: null,
     error: null,
   };
-  if (step.status === 'failed' && doc.status === 'rejected_out_of_scope') {
+  if (step.status === 'rejected') {
     project.error = { code: 'out_of_scope', message: 'الفكرة خارج نطاق النسخة الأولى (CRUD فقط).' };
   }
   if (step.status === 'completed') {

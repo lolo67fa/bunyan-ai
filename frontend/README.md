@@ -23,7 +23,8 @@ npm run dev                  # http://localhost:5173
 | Agent progress dashboard | always on `#/projects/{id}` | `components/AgentTimeline.jsx` |
 | Clarification questions | `awaiting_clarification` | `components/ClarificationForm.jsx` |
 | Requirements review & approval | `awaiting_approval` | `components/RequirementsReview.jsx` |
-| Out-of-scope / failure | `failed` | `pages/ProjectPage.jsx` + `components/OutOfScopeList.jsx` |
+| Approved, waiting for the Architect | `approved` | `pages/ProjectPage.jsx` |
+| Out-of-scope / failure | `rejected` / `failed` | `pages/ProjectPage.jsx` + `components/OutOfScopeList.jsx` |
 | Results: metrics, preview, ZIP | `completed` | `components/ResultsPanel.jsx` |
 | Artifact view / download | any artifact available | `components/ArtifactList.jsx` |
 
@@ -39,52 +40,57 @@ The page polls `GET /projects/{id}` every `VITE_POLL_MS` ms and stops while the 
   - payments / mobile app / chat → rejected as out of scope
   - Gulf-dialect inventory → shows one QA failure and one repair attempt
 - `architecture.json`, `test_report.json`, the generated app, `project_plan.md` and `risks.md` are **placeholders** (`src/mocks/placeholders.js`, marked `_mock`) until their owners share real samples.
-- Mock runs are stored in `localStorage` (`bunyan.mock.projects`), so a refresh keeps them.
+- Mock runs are stored in `localStorage` (`bunyan.mock.projects.v2`), so a refresh keeps them.
 
-## Proposed API contract (needs agreement with Alanoud)
+## API contract
 
-Endpoints follow `docs/architecture.md` §5. The payloads below are what `httpClient.js` sends and expects today.
+Based on Alanoud's backend in PR #5. Each line says whether PR #5 already has it.
 
 ```text
-POST /projects                    body: { "idea": "..." }                      → Project
-GET  /projects/{id}                                                            → Project
-POST /projects/{id}/answers       body: { "answers": { "Q-1": "...", ... } }   → Project
-POST /projects/{id}/approve       body: { "approved": true }
-                                     or { "approved": false, "feedback": "..." } → Project
-GET  /projects/{id}/artifacts/{name}                                           → file content
-GET  /projects/{id}/preview                                                    → generated app (HTML)
-GET  /projects/{id}/download                                                   → bunyan-output.zip
+POST /projects                    body: { "prompt": "..." }                    → 201 Project       [PR #5]
+GET  /projects/{project_id}                                                    → Project           [PR #5]
+POST /projects/{project_id}/approve
+                                  body: { "approved": true }                   → Project           [PR #5, returns 3 fields only]
+                                     or { "approved": false, "feedback": "..." } → Project         [proposed]
+POST /projects/{project_id}/answers
+                                  body: { "answers": { "Q-1": "...", ... } }   → Project           [proposed]
+GET  /projects/{project_id}/artifacts/{name}                                   → file content      [later]
+GET  /projects/{project_id}/preview                                            → generated app     [later]
+GET  /projects/{project_id}/download                                           → bunyan-output.zip [later]
 ```
 
 `Project`:
 
 ```json
 {
-  "id": "p_123",
+  "project_id": "uuid",
   "idea": "…",
-  "status": "created | analyzing | awaiting_clarification | awaiting_approval | designing | developing | testing | repairing | documenting | completed | failed",
+  "status": "analyzing | awaiting_clarification | awaiting_approval | approved | rejected | designing | developing | testing | repairing | documenting | completed | failed",
   "current_agent": "business_analyst | software_architect | developer | qa_tester | project_manager | null",
+  "requirements": "full requirements.json | null",
   "repair_attempt": 0,
-  "created_at": "ISO-8601",
-  "updated_at": "ISO-8601",
-  "requirements": "RequirementsDocument (full requirements.json) | null",
   "artifacts": [{ "name": "requirements.json", "available": true }],
   "metrics": { "pass_rate": 1.0, "checks_passed": 8, "checks_total": 8, "run_time_seconds": 42 },
-  "error": { "code": "out_of_scope", "message": "…" }
+  "error": { "code": "...", "message": "…" },
+  "created_at": "ISO-8601",
+  "updated_at": "ISO-8601"
 }
 ```
 
-Errors: FastAPI default `{ "detail": "..." }` (string or validation list).
+- `project_id`, `idea`, `status`, `current_agent`, `requirements`: in PR #5.
+- The rest are proposed. Until the backend sends them, `httpClient.js` fills safe defaults (`artifacts: []`, `repair_attempt: 0`, `metrics: null`, `error: null`), so the screens work with PR #5 as it is.
+- `rejected`: out-of-scope idea (`requirements.status == "rejected_out_of_scope"`). The run stops and the screen lists `requirements.out_of_scope`.
+- `approved`: requirements approved, next agent not started yet. The page keeps polling.
+- If an action endpoint returns less than a full `Project` (approve in PR #5), the client re-reads `GET /projects/{project_id}`.
+
+Errors: FastAPI default `{ "detail": "..." }` (string or validation list). Proposed: a too-short or blank idea returns `422`, not `500`, so the screen can show the message.
 
 ## Open questions
 
 | # | Question | With |
 |---|---|---|
-| F1 | Final `Project` response shape, status names and payloads above | Alanoud |
-| F2 | Out-of-scope rejection: `failed` + `requirements.status == "rejected_out_of_scope"`, or a dedicated `rejected` status? (analyst decision D8) | Alanoud, Ghala |
-| F3 | Is `requirements` returned inside `GET /projects/{id}` or fetched as an artifact? | Alanoud |
+| F1 | Approve returns the full `Project`; approve accepts `{ approved: false, feedback }`; `POST /answers`; the proposed fields; `422` for invalid ideas | Alanoud |
 | F4 | Preview origin: the generated app uses `localStorage`, so the iframe needs `allow-same-origin`; it must be served from a different origin than the frontend | Alanoud |
-| F5 | CORS for `http://localhost:5173` | Alanoud |
 | F6 | `architecture.json` sample | Naifah |
 | F7 | `test_report.json` format and the list of the 8 core checks | Sara |
 | F8 | Generated file names (`index.html`, `style.css`, `app.js`) and a sample app for the preview | Yara |

@@ -56,7 +56,7 @@ export default function RequirementsReview({ project, onDone }) {
     setSending(true);
     setError('');
     try {
-      onDone(await approveRequirements(project.id, { approved, feedback: feedback.trim() }));
+      onDone(await approveRequirements(project.project_id, { approved, feedback: feedback.trim() }));
     } catch (err) {
       setError(err.message);
     } finally {
