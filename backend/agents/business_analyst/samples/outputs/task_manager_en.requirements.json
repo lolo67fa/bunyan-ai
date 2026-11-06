@@ -267,7 +267,7 @@
       "category": "validation",
       "given": "the create Task form is open",
       "when": "the user leaves all fields empty and clicks \"Save\"",
-      "then": "no Task is saved and an error message is shown next to each required field: Title, Priority, Status"
+      "then": "no Task is saved and an error message is shown next to each required field: Title"
     },
     {
       "id": "AC-3",
