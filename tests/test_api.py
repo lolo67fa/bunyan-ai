@@ -86,7 +86,10 @@ def test_approve_project(client):
 
     project_id = created["project_id"]
 
-    response = client.post(f"/projects/{project_id}/approve")
+    response = client.post(
+        f"/projects/{project_id}/approve",
+        json={"approved": True}
+    )
 
     assert response.status_code == 200
     assert response.json()["status"] == "approved"
@@ -104,8 +107,14 @@ def test_cannot_approve_twice(client):
 
     project_id = created["project_id"]
 
-    client.post(f"/projects/{project_id}/approve")
-    response = client.post(f"/projects/{project_id}/approve")
+    client.post(
+        f"/projects/{project_id}/approve",
+        json={"approved": True}
+    )
+    response = client.post(
+        f"/projects/{project_id}/approve",
+        json={"approved": True}
+    )
 
     assert response.status_code == 409
 
