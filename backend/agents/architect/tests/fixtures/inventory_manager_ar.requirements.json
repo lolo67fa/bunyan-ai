@@ -1,0 +1,699 @@
+{
+  "schema_version": "0.1.0-proposal",
+  "status": "ready_for_review",
+  "language": "ar",
+  "source_idea": "أريد تطبيقاً لإدارة المخزون في متجري الصغير. أحتاج إلى تسجيل المنتجات مع الاسم ورمز الصنف والفئة والكمية وسعر الوحدة، وأريد أن أعرف المنتجات التي قاربت على النفاد. كما أريد تسجيل الدخول للموظفين بكلمة مرور.",
+  "app": {
+    "name": "مدير المخزون",
+    "description": "تطبيق ويب لمتجر صغير لإدارة فئات المنتجات وأصناف المخزون مع الكميات والأسعار وحد إعادة الطلب.",
+    "target_users": [
+      "أصحاب المتاجر الصغيرة",
+      "أمناء المستودعات"
+    ]
+  },
+  "entities": [
+    {
+      "name": "Category",
+      "label": "فئة",
+      "plural_label": "الفئات",
+      "description": "مجموعة من المنتجات المتشابهة.",
+      "display_field": "name",
+      "fields": [
+        {
+          "name": "name",
+          "label": "الاسم",
+          "type": "string",
+          "required": true,
+          "unique": true,
+          "description": "",
+          "enum_values": null,
+          "reference_entity": null,
+          "default": null,
+          "validation": {
+            "min_length": 2,
+            "max_length": 50,
+            "min_value": null,
+            "max_value": null,
+            "pattern": null,
+            "date_constraint": null
+          }
+        },
+        {
+          "name": "description",
+          "label": "الوصف",
+          "type": "text",
+          "required": false,
+          "unique": false,
+          "description": "",
+          "enum_values": null,
+          "reference_entity": null,
+          "default": null,
+          "validation": {
+            "min_length": null,
+            "max_length": 300,
+            "min_value": null,
+            "max_value": null,
+            "pattern": null,
+            "date_constraint": null
+          }
+        }
+      ],
+      "crud": {
+        "create": {
+          "enabled": true,
+          "details": ""
+        },
+        "read": {
+          "enabled": true,
+          "details": "",
+          "list_fields": [
+            "name",
+            "description"
+          ],
+          "search_fields": [
+            "name"
+          ],
+          "filter_fields": [],
+          "sort_field": "name",
+          "sort_direction": "asc"
+        },
+        "update": {
+          "enabled": true,
+          "details": ""
+        },
+        "delete": {
+          "enabled": true,
+          "details": "",
+          "requires_confirmation": true
+        }
+      }
+    },
+    {
+      "name": "Item",
+      "label": "صنف",
+      "plural_label": "الأصناف",
+      "description": "منتج موجود في المخزون.",
+      "display_field": "name",
+      "fields": [
+        {
+          "name": "name",
+          "label": "اسم الصنف",
+          "type": "string",
+          "required": true,
+          "unique": false,
+          "description": "",
+          "enum_values": null,
+          "reference_entity": null,
+          "default": null,
+          "validation": {
+            "min_length": 2,
+            "max_length": 100,
+            "min_value": null,
+            "max_value": null,
+            "pattern": null,
+            "date_constraint": null
+          }
+        },
+        {
+          "name": "sku",
+          "label": "رمز الصنف (SKU)",
+          "type": "string",
+          "required": true,
+          "unique": true,
+          "description": "",
+          "enum_values": null,
+          "reference_entity": null,
+          "default": null,
+          "validation": {
+            "min_length": null,
+            "max_length": null,
+            "min_value": null,
+            "max_value": null,
+            "pattern": "^[A-Z0-9-]{3,20}$",
+            "date_constraint": null
+          }
+        },
+        {
+          "name": "category",
+          "label": "الفئة",
+          "type": "reference",
+          "required": false,
+          "unique": false,
+          "description": "",
+          "enum_values": null,
+          "reference_entity": "Category",
+          "default": null,
+          "validation": {
+            "min_length": null,
+            "max_length": null,
+            "min_value": null,
+            "max_value": null,
+            "pattern": null,
+            "date_constraint": null
+          }
+        },
+        {
+          "name": "quantity",
+          "label": "الكمية",
+          "type": "integer",
+          "required": true,
+          "unique": false,
+          "description": "",
+          "enum_values": null,
+          "reference_entity": null,
+          "default": 0,
+          "validation": {
+            "min_length": null,
+            "max_length": null,
+            "min_value": 0.0,
+            "max_value": null,
+            "pattern": null,
+            "date_constraint": null
+          }
+        },
+        {
+          "name": "unit_price",
+          "label": "سعر الوحدة (ريال)",
+          "type": "decimal",
+          "required": true,
+          "unique": false,
+          "description": "",
+          "enum_values": null,
+          "reference_entity": null,
+          "default": null,
+          "validation": {
+            "min_length": null,
+            "max_length": null,
+            "min_value": 0.0,
+            "max_value": null,
+            "pattern": null,
+            "date_constraint": null
+          }
+        },
+        {
+          "name": "reorder_level",
+          "label": "حد إعادة الطلب",
+          "type": "integer",
+          "required": false,
+          "unique": false,
+          "description": "",
+          "enum_values": null,
+          "reference_entity": null,
+          "default": null,
+          "validation": {
+            "min_length": null,
+            "max_length": null,
+            "min_value": 0.0,
+            "max_value": null,
+            "pattern": null,
+            "date_constraint": null
+          }
+        }
+      ],
+      "crud": {
+        "create": {
+          "enabled": true,
+          "details": ""
+        },
+        "read": {
+          "enabled": true,
+          "details": "",
+          "list_fields": [
+            "name",
+            "sku",
+            "category",
+            "quantity",
+            "unit_price"
+          ],
+          "search_fields": [
+            "name",
+            "sku"
+          ],
+          "filter_fields": [
+            "category"
+          ],
+          "sort_field": "name",
+          "sort_direction": "asc"
+        },
+        "update": {
+          "enabled": true,
+          "details": ""
+        },
+        "delete": {
+          "enabled": true,
+          "details": "",
+          "requires_confirmation": true
+        }
+      }
+    }
+  ],
+  "functional_requirements": [
+    {
+      "id": "FR-1",
+      "entity": "Category",
+      "category": "create",
+      "description": "يجب أن يسمح النظام للمستخدم بإنشاء فئة بإدخال: الاسم، الوصف.",
+      "priority": "must"
+    },
+    {
+      "id": "FR-2",
+      "entity": "Category",
+      "category": "read",
+      "description": "يجب أن يعرض النظام جميع الفئات في قائمة تظهر الاسم، الوصف مرتبة حسب الاسم مع البحث حسب الاسم.",
+      "priority": "must"
+    },
+    {
+      "id": "FR-3",
+      "entity": "Category",
+      "category": "update",
+      "description": "يجب أن يسمح النظام للمستخدم بتعديل أي حقل في سجل موجود من الفئات وحفظ التعديلات.",
+      "priority": "must"
+    },
+    {
+      "id": "FR-4",
+      "entity": "Category",
+      "category": "delete",
+      "description": "يجب أن يسمح النظام للمستخدم بحذف فئة بعد تأكيد العملية في نافذة تأكيد.",
+      "priority": "must"
+    },
+    {
+      "id": "FR-5",
+      "entity": "Category",
+      "category": "validation",
+      "description": "يجب أن يرفض النظام حفظ فئة ما لم: يُدخل الاسم، يكون الاسم غير مكرر، يحتوي الاسم على 2 أحرف على الأقل، لا يتجاوز الاسم 50 حرفاً، لا يتجاوز الوصف 300 حرفاً.",
+      "priority": "must"
+    },
+    {
+      "id": "FR-6",
+      "entity": "Item",
+      "category": "create",
+      "description": "يجب أن يسمح النظام للمستخدم بإنشاء صنف بإدخال: اسم الصنف، رمز الصنف (SKU)، الفئة، الكمية، سعر الوحدة (ريال)، حد إعادة الطلب.",
+      "priority": "must"
+    },
+    {
+      "id": "FR-7",
+      "entity": "Item",
+      "category": "read",
+      "description": "يجب أن يعرض النظام جميع الأصناف في قائمة تظهر اسم الصنف، رمز الصنف (SKU)، الفئة، الكمية، سعر الوحدة (ريال) مرتبة حسب اسم الصنف مع البحث حسب اسم الصنف، رمز الصنف (SKU) والتصفية حسب الفئة.",
+      "priority": "must"
+    },
+    {
+      "id": "FR-8",
+      "entity": "Item",
+      "category": "update",
+      "description": "يجب أن يسمح النظام للمستخدم بتعديل أي حقل في سجل موجود من الأصناف وحفظ التعديلات.",
+      "priority": "must"
+    },
+    {
+      "id": "FR-9",
+      "entity": "Item",
+      "category": "delete",
+      "description": "يجب أن يسمح النظام للمستخدم بحذف صنف بعد تأكيد العملية في نافذة تأكيد.",
+      "priority": "must"
+    },
+    {
+      "id": "FR-10",
+      "entity": "Item",
+      "category": "validation",
+      "description": "يجب أن يرفض النظام حفظ صنف ما لم: يُدخل اسم الصنف، يحتوي اسم الصنف على 2 أحرف على الأقل، لا يتجاوز اسم الصنف 100 حرفاً، يُدخل رمز الصنف (SKU)، يكون رمز الصنف (SKU) غير مكرر، يطابق رمز الصنف (SKU) النمط ^[A-Z0-9-]{3,20}$، يُدخل الكمية، لا تقل قيمة الكمية عن 0، يُدخل سعر الوحدة (ريال)، لا تقل قيمة سعر الوحدة (ريال) عن 0، لا تقل قيمة حد إعادة الطلب عن 0.",
+      "priority": "must"
+    },
+    {
+      "id": "FR-11",
+      "entity": "Item",
+      "category": "validation",
+      "description": "يجب أن يميز النظام الصنف بعلامة \"مخزون منخفض\" في القائمة عندما تكون كميته أقل من أو تساوي حد إعادة الطلب.",
+      "priority": "must"
+    },
+    {
+      "id": "FR-12",
+      "entity": null,
+      "category": "persistence",
+      "description": "يجب أن يحفظ النظام جميع السجلات في localStorage في المتصفح بحيث تبقى بعد إعادة تحميل الصفحة.",
+      "priority": "must"
+    }
+  ],
+  "user_stories": [
+    {
+      "id": "US-1",
+      "role": "صاحب المتجر",
+      "goal": "أضيف سجلاً جديداً إلى الفئات",
+      "benefit": "أحتفظ بالبيانات في مكان واحد",
+      "entity": "Category",
+      "operation": "create",
+      "requirement_ids": [
+        "FR-1",
+        "FR-5",
+        "FR-12"
+      ]
+    },
+    {
+      "id": "US-2",
+      "role": "صاحب المتجر",
+      "goal": "أعرض قائمة الفئات وأبحث فيها",
+      "benefit": "أجد السجل الذي أحتاجه",
+      "entity": "Category",
+      "operation": "read",
+      "requirement_ids": [
+        "FR-2"
+      ]
+    },
+    {
+      "id": "US-3",
+      "role": "صاحب المتجر",
+      "goal": "أعدّل سجلاً موجوداً في الفئات",
+      "benefit": "تبقى البيانات صحيحة ومحدّثة",
+      "entity": "Category",
+      "operation": "update",
+      "requirement_ids": [
+        "FR-3",
+        "FR-5"
+      ]
+    },
+    {
+      "id": "US-4",
+      "role": "صاحب المتجر",
+      "goal": "أحذف سجلاً لم أعد أحتاجه من الفئات",
+      "benefit": "تحتوي القائمة على السجلات المهمة فقط",
+      "entity": "Category",
+      "operation": "delete",
+      "requirement_ids": [
+        "FR-4"
+      ]
+    },
+    {
+      "id": "US-5",
+      "role": "صاحب المتجر",
+      "goal": "أضيف سجلاً جديداً إلى الأصناف",
+      "benefit": "أحتفظ بالبيانات في مكان واحد",
+      "entity": "Item",
+      "operation": "create",
+      "requirement_ids": [
+        "FR-6",
+        "FR-10",
+        "FR-11"
+      ]
+    },
+    {
+      "id": "US-6",
+      "role": "صاحب المتجر",
+      "goal": "أعرض قائمة الأصناف وأبحث فيها",
+      "benefit": "أجد السجل الذي أحتاجه",
+      "entity": "Item",
+      "operation": "read",
+      "requirement_ids": [
+        "FR-7"
+      ]
+    },
+    {
+      "id": "US-7",
+      "role": "صاحب المتجر",
+      "goal": "أعدّل سجلاً موجوداً في الأصناف",
+      "benefit": "تبقى البيانات صحيحة ومحدّثة",
+      "entity": "Item",
+      "operation": "update",
+      "requirement_ids": [
+        "FR-8",
+        "FR-10"
+      ]
+    },
+    {
+      "id": "US-8",
+      "role": "صاحب المتجر",
+      "goal": "أحذف سجلاً لم أعد أحتاجه من الأصناف",
+      "benefit": "تحتوي القائمة على السجلات المهمة فقط",
+      "entity": "Item",
+      "operation": "delete",
+      "requirement_ids": [
+        "FR-9"
+      ]
+    }
+  ],
+  "acceptance_criteria": [
+    {
+      "id": "AC-1",
+      "story_id": "US-1",
+      "category": "create",
+      "given": "قائمة الفئات مفتوحة وتحتوي على N سجل",
+      "when": "يُدخل المستخدم الاسم = \"مشروبات\" ويضغط \"حفظ\"",
+      "then": "يظهر سجل جديد باسم \"مشروبات\" في قائمة الفئات ويصبح عدد السجلات N + 1"
+    },
+    {
+      "id": "AC-2",
+      "story_id": "US-1",
+      "category": "validation",
+      "given": "نموذج الإضافة في الفئات مفتوح",
+      "when": "يترك المستخدم جميع الحقول فارغة ويضغط \"حفظ\"",
+      "then": "لا يُحفظ أي سجل وتظهر رسالة خطأ بجانب كل حقل إلزامي: الاسم"
+    },
+    {
+      "id": "AC-3",
+      "story_id": "US-1",
+      "category": "validation",
+      "given": "نموذج الإضافة في الفئات مفتوح وجميع الحقول الأخرى صحيحة",
+      "when": "يُدخل المستخدم القيمة \"م\" المكونة من حرف واحد في \"الاسم\" ويضغط \"حفظ\"",
+      "then": "لا يُحفظ السجل وتظهر رسالة خطأ بجانب \"الاسم\""
+    },
+    {
+      "id": "AC-4",
+      "story_id": "US-1",
+      "category": "validation",
+      "given": "يوجد في الفئات سجل قيمة \"الاسم\" فيه \"مشروبات\"",
+      "when": "يضيف المستخدم سجلاً آخر بالقيمة \"مشروبات\" في \"الاسم\"",
+      "then": "لا يُحفظ السجل الجديد وتظهر رسالة خطأ بأن قيمة \"الاسم\" مستخدمة مسبقاً"
+    },
+    {
+      "id": "AC-5",
+      "story_id": "US-1",
+      "category": "validation",
+      "given": "نموذج الإضافة في الفئات مفتوح وجميع الحقول الأخرى صحيحة",
+      "when": "يُدخل المستخدم نصاً من 301 حرف في \"الوصف\" ويضغط \"حفظ\"",
+      "then": "لا يُحفظ السجل وتظهر رسالة خطأ بجانب \"الوصف\""
+    },
+    {
+      "id": "AC-6",
+      "story_id": "US-1",
+      "category": "persistence",
+      "given": "تمت إضافة سجل باسم \"مشروبات\" إلى الفئات",
+      "when": "يعيد المستخدم تحميل الصفحة",
+      "then": "يبقى \"مشروبات\" ظاهراً في قائمة الفئات بنفس القيم"
+    },
+    {
+      "id": "AC-7",
+      "story_id": "US-2",
+      "category": "read",
+      "given": "تمت إضافة 3 سجلات إلى الفئات",
+      "when": "يفتح المستخدم قائمة الفئات",
+      "then": "تظهر 3 صفوف بالضبط، يحتوي كل منها على الأعمدة الاسم، الوصف"
+    },
+    {
+      "id": "AC-8",
+      "story_id": "US-2",
+      "category": "read",
+      "given": "لا توجد سجلات في الفئات",
+      "when": "يفتح المستخدم قائمة الفئات",
+      "then": "تظهر رسالة تفيد بعدم وجود سجلات بدلاً من القائمة"
+    },
+    {
+      "id": "AC-9",
+      "story_id": "US-2",
+      "category": "read",
+      "given": "يوجد في الفئات سجلان باسم \"مشروبات\" و\"سجل آخر\"",
+      "when": "يكتب المستخدم \"مشروبات\" في مربع البحث",
+      "then": "يظهر السجل \"مشروبات\" فقط في القائمة"
+    },
+    {
+      "id": "AC-10",
+      "story_id": "US-3",
+      "category": "update",
+      "given": "يوجد في الفئات سجل باسم \"مشروبات\"",
+      "when": "يغير المستخدم الاسم إلى \"مشروبات (معدل)\" ويضغط \"حفظ\" ثم يعيد تحميل الصفحة",
+      "then": "تعرض القائمة \"مشروبات (معدل)\" ولا تعرض \"مشروبات\""
+    },
+    {
+      "id": "AC-11",
+      "story_id": "US-3",
+      "category": "validation",
+      "given": "يوجد في الفئات سجل باسم \"مشروبات\"",
+      "when": "يمسح المستخدم الاسم في نموذج التعديل ويضغط \"حفظ\"",
+      "then": "لا يُحفظ التعديل وتظهر رسالة خطأ ويبقى \"مشروبات\" في القائمة"
+    },
+    {
+      "id": "AC-12",
+      "story_id": "US-4",
+      "category": "delete",
+      "given": "يوجد في الفئات سجل باسم \"مشروبات\" وتعرض القائمة N سجل",
+      "when": "يضغط المستخدم \"حذف\" عليه ثم يؤكد",
+      "then": "يُزال \"مشروبات\" من القائمة ويصبح العدد N - 1 ويبقى غير موجود بعد إعادة تحميل الصفحة"
+    },
+    {
+      "id": "AC-13",
+      "story_id": "US-4",
+      "category": "delete",
+      "given": "يوجد في الفئات سجل باسم \"مشروبات\"",
+      "when": "يضغط المستخدم \"حذف\" عليه ثم يلغي التأكيد",
+      "then": "يبقى \"مشروبات\" ظاهراً في القائمة"
+    },
+    {
+      "id": "AC-14",
+      "story_id": "US-5",
+      "category": "create",
+      "given": "قائمة الأصناف مفتوحة وتحتوي على N سجل",
+      "when": "يُدخل المستخدم اسم الصنف = \"مياه معدنية 330 مل\"، رمز الصنف (SKU) = \"WTR-330\"، الكمية = \"24\"، سعر الوحدة (ريال) = \"2.50\" ويضغط \"حفظ\"",
+      "then": "يظهر سجل جديد باسم \"مياه معدنية 330 مل\" في قائمة الأصناف ويصبح عدد السجلات N + 1"
+    },
+    {
+      "id": "AC-15",
+      "story_id": "US-5",
+      "category": "validation",
+      "given": "نموذج الإضافة في الأصناف مفتوح",
+      "when": "يترك المستخدم جميع الحقول فارغة ويضغط \"حفظ\"",
+      "then": "لا يُحفظ أي سجل وتظهر رسالة خطأ بجانب كل حقل إلزامي: اسم الصنف، رمز الصنف (SKU)، الكمية، سعر الوحدة (ريال)"
+    },
+    {
+      "id": "AC-16",
+      "story_id": "US-5",
+      "category": "validation",
+      "given": "نموذج الإضافة في الأصناف مفتوح وجميع الحقول الأخرى صحيحة",
+      "when": "يُدخل المستخدم القيمة \"م\" المكونة من حرف واحد في \"اسم الصنف\" ويضغط \"حفظ\"",
+      "then": "لا يُحفظ السجل وتظهر رسالة خطأ بجانب \"اسم الصنف\""
+    },
+    {
+      "id": "AC-17",
+      "story_id": "US-5",
+      "category": "validation",
+      "given": "نموذج الإضافة في الأصناف مفتوح وجميع الحقول الأخرى صحيحة",
+      "when": "يُدخل المستخدم القيمة \"wtr 330\" (حروف صغيرة ومسافة) في \"رمز الصنف (SKU)\" ويضغط \"حفظ\"",
+      "then": "لا يُحفظ السجل وتظهر رسالة خطأ بجانب \"رمز الصنف (SKU)\""
+    },
+    {
+      "id": "AC-18",
+      "story_id": "US-5",
+      "category": "validation",
+      "given": "يوجد في الأصناف سجل قيمة \"رمز الصنف (SKU)\" فيه \"WTR-330\"",
+      "when": "يضيف المستخدم سجلاً آخر بالقيمة \"WTR-330\" في \"رمز الصنف (SKU)\"",
+      "then": "لا يُحفظ السجل الجديد وتظهر رسالة خطأ بأن قيمة \"رمز الصنف (SKU)\" مستخدمة مسبقاً"
+    },
+    {
+      "id": "AC-19",
+      "story_id": "US-5",
+      "category": "validation",
+      "given": "نموذج الإضافة في الأصناف مفتوح وجميع الحقول الأخرى صحيحة",
+      "when": "يُدخل المستخدم القيمة -1 في \"الكمية\" ويضغط \"حفظ\"",
+      "then": "لا يُحفظ السجل وتظهر رسالة خطأ بجانب \"الكمية\""
+    },
+    {
+      "id": "AC-20",
+      "story_id": "US-5",
+      "category": "validation",
+      "given": "نموذج الإضافة في الأصناف مفتوح وجميع الحقول الأخرى صحيحة",
+      "when": "يُدخل المستخدم القيمة -5 في \"سعر الوحدة (ريال)\" ويضغط \"حفظ\"",
+      "then": "لا يُحفظ السجل وتظهر رسالة خطأ بجانب \"سعر الوحدة (ريال)\""
+    },
+    {
+      "id": "AC-21",
+      "story_id": "US-5",
+      "category": "validation",
+      "given": "نموذج الإضافة في الأصناف مفتوح وجميع الحقول الأخرى صحيحة",
+      "when": "يُدخل المستخدم القيمة -1 في \"حد إعادة الطلب\" ويضغط \"حفظ\"",
+      "then": "لا يُحفظ السجل وتظهر رسالة خطأ بجانب \"حد إعادة الطلب\""
+    },
+    {
+      "id": "AC-22",
+      "story_id": "US-5",
+      "category": "validation",
+      "given": "يوجد صنف كميته 5 وحد إعادة الطلب له 10",
+      "when": "يفتح المستخدم قائمة الأصناف",
+      "then": "يظهر في صف هذا الصنف الوسم \"مخزون منخفض\""
+    },
+    {
+      "id": "AC-23",
+      "story_id": "US-5",
+      "category": "persistence",
+      "given": "تمت إضافة سجل باسم \"مياه معدنية 330 مل\" إلى الأصناف",
+      "when": "يعيد المستخدم تحميل الصفحة",
+      "then": "يبقى \"مياه معدنية 330 مل\" ظاهراً في قائمة الأصناف بنفس القيم"
+    },
+    {
+      "id": "AC-24",
+      "story_id": "US-6",
+      "category": "read",
+      "given": "تمت إضافة 3 سجلات إلى الأصناف",
+      "when": "يفتح المستخدم قائمة الأصناف",
+      "then": "تظهر 3 صفوف بالضبط، يحتوي كل منها على الأعمدة اسم الصنف، رمز الصنف (SKU)، الفئة، الكمية، سعر الوحدة (ريال)"
+    },
+    {
+      "id": "AC-25",
+      "story_id": "US-6",
+      "category": "read",
+      "given": "لا توجد سجلات في الأصناف",
+      "when": "يفتح المستخدم قائمة الأصناف",
+      "then": "تظهر رسالة تفيد بعدم وجود سجلات بدلاً من القائمة"
+    },
+    {
+      "id": "AC-26",
+      "story_id": "US-6",
+      "category": "read",
+      "given": "يوجد في الأصناف سجلان باسم \"مياه معدنية 330 مل\" و\"سجل آخر\"",
+      "when": "يكتب المستخدم \"مياه معدنية 330 مل\" في مربع البحث",
+      "then": "يظهر السجل \"مياه معدنية 330 مل\" فقط في القائمة"
+    },
+    {
+      "id": "AC-27",
+      "story_id": "US-7",
+      "category": "update",
+      "given": "يوجد في الأصناف سجل باسم \"مياه معدنية 330 مل\"",
+      "when": "يغير المستخدم اسم الصنف إلى \"مياه معدنية 330 مل (معدل)\" ويضغط \"حفظ\" ثم يعيد تحميل الصفحة",
+      "then": "تعرض القائمة \"مياه معدنية 330 مل (معدل)\" ولا تعرض \"مياه معدنية 330 مل\""
+    },
+    {
+      "id": "AC-28",
+      "story_id": "US-7",
+      "category": "validation",
+      "given": "يوجد في الأصناف سجل باسم \"مياه معدنية 330 مل\"",
+      "when": "يمسح المستخدم اسم الصنف في نموذج التعديل ويضغط \"حفظ\"",
+      "then": "لا يُحفظ التعديل وتظهر رسالة خطأ ويبقى \"مياه معدنية 330 مل\" في القائمة"
+    },
+    {
+      "id": "AC-29",
+      "story_id": "US-8",
+      "category": "delete",
+      "given": "يوجد في الأصناف سجل باسم \"مياه معدنية 330 مل\" وتعرض القائمة N سجل",
+      "when": "يضغط المستخدم \"حذف\" عليه ثم يؤكد",
+      "then": "يُزال \"مياه معدنية 330 مل\" من القائمة ويصبح العدد N - 1 ويبقى غير موجود بعد إعادة تحميل الصفحة"
+    },
+    {
+      "id": "AC-30",
+      "story_id": "US-8",
+      "category": "delete",
+      "given": "يوجد في الأصناف سجل باسم \"مياه معدنية 330 مل\"",
+      "when": "يضغط المستخدم \"حذف\" عليه ثم يلغي التأكيد",
+      "then": "يبقى \"مياه معدنية 330 مل\" ظاهراً في القائمة"
+    }
+  ],
+  "clarification_questions": [
+    {
+      "id": "Q-1",
+      "question": "عند حذف فئة، هل تُحذف أصنافها أيضاً أم يُمنع الحذف ما دامت مستخدمة؟",
+      "reason": "يحدد سلوك الحذف للسجلات المرتبطة.",
+      "blocking": false,
+      "options": [],
+      "suggested_default": "منع حذف الفئة إذا كانت تحتوي على أصناف."
+    }
+  ],
+  "assumptions": [
+    "يستخدم التطبيق شخص واحد في متصفح واحد؛ وتُحفظ البيانات في localStorage.",
+    "يحصل كل سجل تلقائياً على حقول النظام id و created_at و updated_at.",
+    "لا يتم تتبع حركات المخزون (سجل المشتريات والمبيعات)؛ يعدّل المستخدم الكمية مباشرة.",
+    "الأسعار بالريال السعودي."
+  ],
+  "out_of_scope": [
+    {
+      "feature": "حسابات المستخدمين وتسجيل الدخول ('تسجيل الدخول')",
+      "category": "authentication",
+      "reason": "التطبيقات المولدة لمستخدم واحد وتعمل في المتصفح دون نظام تسجيل دخول.",
+      "action": "excluded",
+      "alternative": null
+    }
+  ]
+}

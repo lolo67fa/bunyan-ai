@@ -1,5 +1,5 @@
 {
-  "schema_version": "0.2.0-proposal",
+  "schema_version": "0.3.0-proposal",
   "source": {
     "requirements_schema_version": "0.1.0-proposal"
   },
@@ -37,6 +37,11 @@
           "min_length": 2,
           "max_length": 100
         },
+        "messages": {
+          "required": "Client name is required",
+          "min_length": "Client name must be at least 2 characters",
+          "max_length": "Client name must be at most 100 characters"
+        },
         "show_in_list": true
       },
       {
@@ -48,6 +53,10 @@
         "unique": false,
         "validation": {
           "pattern": "^\\+?[0-9]{9,15}$"
+        },
+        "messages": {
+          "required": "Client phone is required",
+          "pattern": "Client phone format is invalid"
         },
         "show_in_list": false
       },
@@ -72,7 +81,11 @@
             "label": "Check up"
           }
         ],
+        "empty_option": "Select Service",
         "validation": {},
+        "messages": {
+          "required": "Service is required"
+        },
         "show_in_list": true
       },
       {
@@ -85,6 +98,10 @@
         "validation": {
           "date_constraint": "not_in_past"
         },
+        "messages": {
+          "required": "Date is required",
+          "date_constraint": "Date cannot be in the past"
+        },
         "show_in_list": true
       },
       {
@@ -95,6 +112,9 @@
         "required": true,
         "unique": false,
         "validation": {},
+        "messages": {
+          "required": "Time is required"
+        },
         "show_in_list": true
       },
       {
@@ -106,9 +126,17 @@
         "unique": false,
         "default": 30,
         "step": 1.0,
+        "display_format": {
+          "decimals": 0
+        },
         "validation": {
           "min_value": 15.0,
           "max_value": 240.0
+        },
+        "messages": {
+          "required": "Duration (minutes) is required",
+          "min_value": "Duration (minutes) must be 15 or more",
+          "max_value": "Duration (minutes) must be 240 or less"
         },
         "show_in_list": false
       },
@@ -135,6 +163,9 @@
           }
         ],
         "validation": {},
+        "messages": {
+          "required": "Status is required"
+        },
         "show_in_list": true
       },
       {
@@ -146,6 +177,9 @@
         "unique": false,
         "validation": {
           "max_length": 500
+        },
+        "messages": {
+          "max_length": "Notes must be at most 500 characters"
         },
         "show_in_list": false
       }
@@ -273,10 +307,9 @@
     "after_delete": "remove_row_and_show_message"
   },
   "messages": {
-    "empty": "No Appointments yet.",
-    "required": "This field is required",
+    "empty": "No records yet.",
+    "no_results": "No records match your search.",
     "invalid": "Invalid value",
-    "unique": "This value is already in use",
     "created": "Added successfully",
     "updated": "Changes saved",
     "deleted": "Deleted",
@@ -286,6 +319,20 @@
     "edit_button": "Edit",
     "delete_button": "Delete"
   },
+  "verbatim_messages": [
+    {
+      "path": "messages.delete_button",
+      "text": "Delete",
+      "source": "AC-15"
+    },
+    {
+      "path": "screens.form.save_button",
+      "text": "Save",
+      "source": "AC-1"
+    }
+  ],
   "deferred_rules": [],
-  "warnings": []
+  "warnings": [
+    "AC-8 quotes the message “This time slot is already booked” but it is not tied to one field rule (likely a business rule such as no double booking); the MVP template cannot show it"
+  ]
 }

@@ -1,6 +1,6 @@
 """Provisional ``architecture.json`` contract produced by the Software Architect Agent.
 
-PROPOSAL — NOT YET APPROVED (Naifah, Yara, Alanoud, Sara).
+PROPOSAL — NOT YET APPROVED (Naifah, Ghala, Yara, Alanoud, Sara).
 
 Built to consume the Business Analyst contract ``requirements.json`` v0.1.0-proposal
 (``backend/agents/business_analyst/schema.py`` on ``feature/ghala-analyst``):
@@ -8,6 +8,8 @@ Built to consume the Business Analyst contract ``requirements.json`` v0.1.0-prop
 - Entity and field ``name`` values are copied unchanged from requirements.json.
 - Field ``type`` keeps the requirements data type; ``input`` adds the HTML control.
 - Validation rule names are identical to requirements.json (``min_value``, ``date_constraint`` ...).
+- Every field rule has its own error message (``fields[].messages``). Messages quoted in the
+  acceptance criteria are copied verbatim and listed in ``verbatim_messages`` (rule M1 in CONTRACT.md).
 
 MVP limits (enforced here, see CONTRACT.md):
 - exactly ONE entity, no ``reference`` fields;
@@ -25,7 +27,7 @@ from typing import Any, List, Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-SCHEMA_VERSION = "0.2.0-proposal"
+SCHEMA_VERSION = "0.3.0-proposal"
 REQUIREMENTS_SCHEMA_VERSION = "0.1.0-proposal"
 
 FieldType = Literal[
@@ -73,6 +75,26 @@ class ValidationRules(_Model):
     date_constraint: Optional[Literal["not_in_past", "not_in_future"]] = None
 
 
+class FieldMessages(_Model):
+    """One error message per rule of the field. Keys mirror ValidationRules plus required/unique."""
+
+    required: Optional[str] = None
+    unique: Optional[str] = None
+    min_length: Optional[str] = None
+    max_length: Optional[str] = None
+    min_value: Optional[str] = None
+    max_value: Optional[str] = None
+    pattern: Optional[str] = None
+    date_constraint: Optional[str] = None
+
+
+class DisplayFormat(_Model):
+    """How the list shows the value. Numbers are formatted with exactly ``decimals`` digits."""
+
+    decimals: Optional[int] = Field(default=None, ge=0, le=4)
+    unit: Optional[str] = Field(default=None, description="Shown after the value, e.g. 'ر.س' or 'SAR'.")
+
+
 class Option(_Model):
     value: str = Field(min_length=1, description="Stored value, copied from requirements enum_values.")
     label: str = Field(min_length=1, description="Text shown in the select, in the app language.")
@@ -87,8 +109,15 @@ class FieldSpec(_Model):
     unique: bool = False
     default: Optional[Union[str, int, float, bool]] = None
     options: Optional[List[Option]] = None
+    empty_option: Optional[str] = Field(
+        default=None,
+        description="Enum only: label of a first, empty option (value ''). Present whenever there is no default, "
+        "so a required select really starts empty and the required check can fail.",
+    )
     step: Optional[float] = Field(default=None, gt=0, description="Number inputs only: 1 for integer, 0.01 for decimal.")
+    display_format: Optional[DisplayFormat] = None
     validation: ValidationRules = Field(default_factory=ValidationRules)
+    messages: FieldMessages = Field(default_factory=FieldMessages)
     show_in_list: bool
 
     @model_validator(mode="after")
@@ -106,13 +135,23 @@ class FieldSpec(_Model):
                 raise ValueError(f"enum field '{n}' has duplicate option values")
             if self.default is not None and self.default not in values:
                 raise ValueError(f"default of '{n}' must be one of its option values")
-        elif self.options is not None:
-            raise ValueError(f"options are only allowed on enum fields ('{n}')")
+            if self.default is None and not self.empty_option:
+                raise ValueError(f"enum field '{n}' has no default, so it needs empty_option")
+            if self.default is not None and self.empty_option:
+                raise ValueError(f"enum field '{n}' has a default, so it must not have empty_option")
+        elif self.options is not None or self.empty_option is not None:
+            raise ValueError(f"options/empty_option are only allowed on enum fields ('{n}')")
         if self.type in NUMBER_TYPES:
             if self.step is None:
                 raise ValueError(f"number field '{n}' needs step")
+            if self.display_format is None or self.display_format.decimals is None:
+                raise ValueError(f"number field '{n}' needs display_format.decimals")
+            if self.type == "integer" and self.display_format.decimals != 0:
+                raise ValueError(f"integer field '{n}' must use display_format.decimals = 0")
         elif self.step is not None:
             raise ValueError(f"step is only allowed on number fields ('{n}')")
+        elif self.display_format is not None and self.display_format.decimals is not None:
+            raise ValueError(f"display_format.decimals is only allowed on number fields ('{n}')")
         v = self.validation
         if (v.min_length is not None or v.max_length is not None or v.pattern) and self.type not in TEXT_TYPES:
             raise ValueError(f"length/pattern rules are only allowed on text fields ('{n}')")
@@ -124,6 +163,17 @@ class FieldSpec(_Model):
             raise ValueError(f"field '{n}': min_length > max_length")
         if v.min_value is not None and v.max_value is not None and v.min_value > v.max_value:
             raise ValueError(f"field '{n}': min_value > max_value")
+        # every rule the form enforces must have its own message, and no message without a rule
+        active = {k for k, val in v.model_dump().items() if val is not None}
+        if self.required:
+            active.add("required")
+        if self.unique:
+            active.add("unique")
+        given = {k for k, val in self.messages.model_dump().items() if val}
+        if active - given:
+            raise ValueError(f"field '{n}' is missing messages for {sorted(active - given)}")
+        if given - active:
+            raise ValueError(f"field '{n}' has messages for rules it does not have: {sorted(given - active)}")
         return self
 
 
@@ -268,12 +318,14 @@ class Behaviors(_Model):
 
 
 class Messages(_Model):
-    """User-facing text. ``{display}`` is replaced at runtime by the record's display_field value."""
+    """Screen-level text. Field errors live in ``entity.fields[].messages``.
 
-    empty: str
-    required: str
-    invalid: str
-    unique: str
+    ``{display}`` is replaced at runtime by the record's display_field value.
+    """
+
+    empty: str = Field(description="List has no records at all.")
+    no_results: str = Field(description="Records exist but search/filters match none.")
+    invalid: str = Field(description="Fallback only, e.g. a browser-level input error.")
     created: str
     updated: str
     deleted: str
@@ -282,6 +334,14 @@ class Messages(_Model):
     cancel_delete_button: str
     edit_button: str
     delete_button: str
+
+
+class VerbatimMessage(_Model):
+    """A text the acceptance criteria quote literally. The app must show it exactly; QA compares it exactly."""
+
+    path: str = Field(description="Where it is used, e.g. 'messages.empty' or 'entity.fields.title.messages.required'.")
+    text: str = Field(min_length=1)
+    source: str = Field(pattern=r"^AC-\d+$", description="Acceptance criterion it was copied from.")
 
 
 class DeferredRule(_Model):
@@ -303,7 +363,7 @@ class Source(_Model):
 
 
 class ArchitectureDocument(_Model):
-    schema_version: Literal["0.2.0-proposal"] = SCHEMA_VERSION
+    schema_version: Literal["0.3.0-proposal"] = SCHEMA_VERSION
     source: Source = Field(default_factory=Source)
     app: AppInfo
     entity: EntitySpec
@@ -311,6 +371,7 @@ class ArchitectureDocument(_Model):
     navigation: Navigation
     behaviors: Behaviors
     messages: Messages
+    verbatim_messages: List[VerbatimMessage] = Field(default_factory=list)
     deferred_rules: List[DeferredRule] = Field(default_factory=list)
     warnings: List[str] = Field(default_factory=list, description="Gaps the Architect noticed; shown to the PM agent.")
 
@@ -344,7 +405,31 @@ class ArchitectureDocument(_Model):
         has_unique = any(f.unique for f in self.entity.fields)
         if self.behaviors.check_unique_before_save != has_unique:
             raise ValueError("check_unique_before_save must be true exactly when a field is unique")
+        for vm in self.verbatim_messages:
+            if _resolve(self, vm.path) != vm.text:
+                raise ValueError(f"verbatim message {vm.source} is not used at '{vm.path}'")
         return self
+
+
+def _resolve(doc: "ArchitectureDocument", path: str) -> Optional[str]:
+    """Return the text at a verbatim-message path, or None if the path does not exist.
+
+    Supported paths:
+      messages.<key>
+      entity.fields.<field>.messages.<rule>
+      screens.<screen_id>.<button_type>          (label of add/save/cancel button)
+    """
+    parts = path.split(".")
+    if len(parts) == 2 and parts[0] == "messages":
+        return getattr(doc.messages, parts[1], None)
+    if len(parts) == 5 and parts[:2] == ["entity", "fields"] and parts[3] == "messages":
+        field = next((f for f in doc.entity.fields if f.name == parts[2]), None)
+        return getattr(field.messages, parts[4], None) if field else None
+    if len(parts) == 3 and parts[0] == "screens":
+        screen = next((s for s in doc.screens if s.id == parts[1]), None)
+        comp = next((c for c in screen.components if c.type == parts[2]), None) if screen else None
+        return getattr(comp, "label", None)
+    return None
 
 
 def json_schema() -> dict:

@@ -137,6 +137,41 @@
       "title": "DeferredRule",
       "type": "object"
     },
+    "DisplayFormat": {
+      "additionalProperties": false,
+      "description": "How the list shows the value. Numbers are formatted with exactly ``decimals`` digits.",
+      "properties": {
+        "decimals": {
+          "anyOf": [
+            {
+              "maximum": 4,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Decimals"
+        },
+        "unit": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Shown after the value, e.g. 'ر.س' or 'SAR'.",
+          "title": "Unit"
+        }
+      },
+      "title": "DisplayFormat",
+      "type": "object"
+    },
     "EmptyState": {
       "additionalProperties": false,
       "properties": {
@@ -197,6 +232,110 @@
         "fields"
       ],
       "title": "EntitySpec",
+      "type": "object"
+    },
+    "FieldMessages": {
+      "additionalProperties": false,
+      "description": "One error message per rule of the field. Keys mirror ValidationRules plus required/unique.",
+      "properties": {
+        "required": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Required"
+        },
+        "unique": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Unique"
+        },
+        "min_length": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Min Length"
+        },
+        "max_length": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Length"
+        },
+        "min_value": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Min Value"
+        },
+        "max_value": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Value"
+        },
+        "pattern": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pattern"
+        },
+        "date_constraint": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Date Constraint"
+        }
+      },
+      "title": "FieldMessages",
       "type": "object"
     },
     "FieldSpec": {
@@ -292,6 +431,19 @@
           "default": null,
           "title": "Options"
         },
+        "empty_option": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Enum only: label of a first, empty option (value ''). Present whenever there is no default, so a required select really starts empty and the required check can fail.",
+          "title": "Empty Option"
+        },
         "step": {
           "anyOf": [
             {
@@ -306,8 +458,22 @@
           "description": "Number inputs only: 1 for integer, 0.01 for decimal.",
           "title": "Step"
         },
+        "display_format": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DisplayFormat"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "validation": {
           "$ref": "#/$defs/ValidationRules"
+        },
+        "messages": {
+          "$ref": "#/$defs/FieldMessages"
         },
         "show_in_list": {
           "title": "Show In List",
@@ -390,22 +556,21 @@
     },
     "Messages": {
       "additionalProperties": false,
-      "description": "User-facing text. ``{display}`` is replaced at runtime by the record's display_field value.",
+      "description": "Screen-level text. Field errors live in ``entity.fields[].messages``.\n\n``{display}`` is replaced at runtime by the record's display_field value.",
       "properties": {
         "empty": {
+          "description": "List has no records at all.",
           "title": "Empty",
           "type": "string"
         },
-        "required": {
-          "title": "Required",
+        "no_results": {
+          "description": "Records exist but search/filters match none.",
+          "title": "No Results",
           "type": "string"
         },
         "invalid": {
+          "description": "Fallback only, e.g. a browser-level input error.",
           "title": "Invalid",
-          "type": "string"
-        },
-        "unique": {
-          "title": "Unique",
           "type": "string"
         },
         "created": {
@@ -443,9 +608,8 @@
       },
       "required": [
         "empty",
-        "required",
+        "no_results",
         "invalid",
-        "unique",
         "created",
         "updated",
         "deleted",
@@ -885,13 +1049,42 @@
       },
       "title": "ValidationRules",
       "type": "object"
+    },
+    "VerbatimMessage": {
+      "additionalProperties": false,
+      "description": "A text the acceptance criteria quote literally. The app must show it exactly; QA compares it exactly.",
+      "properties": {
+        "path": {
+          "description": "Where it is used, e.g. 'messages.empty' or 'entity.fields.title.messages.required'.",
+          "title": "Path",
+          "type": "string"
+        },
+        "text": {
+          "minLength": 1,
+          "title": "Text",
+          "type": "string"
+        },
+        "source": {
+          "description": "Acceptance criterion it was copied from.",
+          "pattern": "^AC-\\d+$",
+          "title": "Source",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "text",
+        "source"
+      ],
+      "title": "VerbatimMessage",
+      "type": "object"
     }
   },
   "additionalProperties": false,
   "properties": {
     "schema_version": {
-      "const": "0.2.0-proposal",
-      "default": "0.2.0-proposal",
+      "const": "0.3.0-proposal",
+      "default": "0.3.0-proposal",
       "title": "Schema Version",
       "type": "string"
     },
@@ -922,6 +1115,13 @@
     "messages": {
       "$ref": "#/$defs/Messages"
     },
+    "verbatim_messages": {
+      "items": {
+        "$ref": "#/$defs/VerbatimMessage"
+      },
+      "title": "Verbatim Messages",
+      "type": "array"
+    },
     "deferred_rules": {
       "items": {
         "$ref": "#/$defs/DeferredRule"
@@ -950,5 +1150,5 @@
   "type": "object",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "bunyan-ai/architect/architecture.schema.json",
-  "$comment": "Provisional contract v0.2.0-proposal. Generated from backend/agents/architect/schema.py; do not edit by hand. Cross-reference rules are enforced by the Pydantic model only."
+  "$comment": "Provisional contract v0.3.0-proposal. Generated from backend/agents/architect/schema.py; do not edit by hand. Cross-reference rules are enforced by the Pydantic model only."
 }

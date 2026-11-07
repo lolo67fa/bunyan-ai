@@ -1,5 +1,5 @@
 {
-  "schema_version": "0.2.0-proposal",
+  "schema_version": "0.3.0-proposal",
   "source": {
     "requirements_schema_version": "0.1.0-proposal"
   },
@@ -37,6 +37,11 @@
           "min_length": 3,
           "max_length": 100
         },
+        "messages": {
+          "required": "Title is required",
+          "min_length": "Title must be at least 3 characters",
+          "max_length": "Title must be at most 100 characters"
+        },
         "show_in_list": true
       },
       {
@@ -49,6 +54,9 @@
         "validation": {
           "max_length": 1000
         },
+        "messages": {
+          "max_length": "Description must be at most 1000 characters"
+        },
         "show_in_list": false
       },
       {
@@ -60,6 +68,9 @@
         "unique": false,
         "validation": {
           "date_constraint": "not_in_past"
+        },
+        "messages": {
+          "date_constraint": "Due date cannot be in the past"
         },
         "show_in_list": true
       },
@@ -86,6 +97,9 @@
           }
         ],
         "validation": {},
+        "messages": {
+          "required": "Priority is required"
+        },
         "show_in_list": true
       },
       {
@@ -111,6 +125,9 @@
           }
         ],
         "validation": {},
+        "messages": {
+          "required": "Status is required"
+        },
         "show_in_list": true
       }
     ]
@@ -231,10 +248,9 @@
     "after_delete": "remove_row_and_show_message"
   },
   "messages": {
-    "empty": "No Tasks yet.",
-    "required": "This field is required",
+    "empty": "No records yet.",
+    "no_results": "No records match your search.",
     "invalid": "Invalid value",
-    "unique": "This value is already in use",
     "created": "Added successfully",
     "updated": "Changes saved",
     "deleted": "Deleted",
@@ -244,6 +260,18 @@
     "edit_button": "Edit",
     "delete_button": "Delete"
   },
+  "verbatim_messages": [
+    {
+      "path": "messages.delete_button",
+      "text": "Delete",
+      "source": "AC-12"
+    },
+    {
+      "path": "screens.form.save_button",
+      "text": "Save",
+      "source": "AC-1"
+    }
+  ],
   "deferred_rules": [],
   "warnings": []
 }

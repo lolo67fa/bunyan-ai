@@ -1,13 +1,15 @@
 # Software Architect Agent
 
 **Owner:** Naifah · **Input:** approved `requirements.json` · **Output:** `architecture.json`
-**Contract:** v0.2.0-proposal, see [`contract/CONTRACT.md`](contract/CONTRACT.md) (not yet approved).
+**Contract:** v0.3.0-proposal, see [`contract/CONTRACT.md`](contract/CONTRACT.md) (not yet approved).
 
 ## Status
 
 - ✅ Contract (Pydantic) with cross-reference validation.
 - ✅ Deterministic builder `build_architecture(requirements_dict)`; refuses out-of-MVP input with reasons.
-- ✅ Samples generated from Ghala's Business Analyst samples (`samples/outputs/`).
+- ✅ Per-field error messages, `no_results`, number display format, empty option for selects without default.
+- ✅ Texts quoted in acceptance criteria are copied verbatim (`verbatim_messages`, rule M1).
+- ✅ Samples generated from every Business Analyst sample on `main` (`samples/outputs/`).
 - ⏳ LLM layer (enum labels, wording) and CrewAI wiring: not started.
 
 ## Use

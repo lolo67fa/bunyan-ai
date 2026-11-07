@@ -1,4 +1,4 @@
-"""Software Architect Agent (owner: Naifah). Contract: architecture.json v0.2.0-proposal."""
+"""Software Architect Agent (owner: Naifah). Contract: architecture.json v0.3.0-proposal."""
 
 from .from_requirements import ArchitectureError, build_architecture
 from .schema import SCHEMA_VERSION, ArchitectureDocument, json_schema

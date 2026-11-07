@@ -1,22 +1,29 @@
 """Deterministic mapping: approved requirements.json -> architecture.json.
 
 This is the backbone of the Architect Agent. Everything that has exactly one right
-answer (control types, storage key, screens, navigation, validation) is derived here
-in code, so it is identical on every run and cannot be hallucinated. A model is only
-needed for the parts marked ``warnings`` (e.g. human labels for enum values), which
-can be layered on top later without changing this contract.
+answer (control types, storage key, screens, navigation, validation, messages) is derived
+here in code, so it is identical on every run and cannot be hallucinated. A model is only
+needed for the parts marked ``warnings`` (e.g. human labels for English enum values),
+which can be layered on top later without changing this contract.
+
+Messages follow rule M1 (CONTRACT.md §6):
+- a message the acceptance criteria quote literally is copied verbatim and listed in
+  ``verbatim_messages`` so QA can compare it exactly;
+- every other message is generated from one fixed template per rule, so wording is the
+  same in every app and QA only checks that the message is visible.
 """
 
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, List
+from collections import Counter
+from typing import Any, Dict, List, Optional
 
 from .schema import (
+    FILTERABLE_TYPES,
     INPUT_FOR_TYPE,
     NUMBER_TYPES,
     SEARCHABLE_TYPES,
-    FILTERABLE_TYPES,
     ArchitectureDocument,
 )
 
@@ -25,19 +32,61 @@ _TEXT = {
         "add": "إضافة {label}", "save": "حفظ", "cancel": "إلغاء", "search": "بحث في {plural}",
         "form_title": "بيانات {label}", "edit": "تعديل", "delete": "حذف",
         "confirm": "تأكيد الحذف", "cancel_delete": "تراجع",
-        "empty": "لا توجد {plural} بعد.", "required": "هذا الحقل مطلوب", "invalid": "القيمة غير صحيحة",
-        "unique": "هذه القيمة مستخدمة مسبقًا", "created": "تمت الإضافة بنجاح", "updated": "تم حفظ التعديلات",
-        "deleted": "تم الحذف", "confirm_delete": "هل تريد حذف «{display}»؟",
+        "empty": "لا توجد سجلات بعد.", "no_results": "لا توجد نتائج مطابقة للبحث.",
+        "invalid": "القيمة غير صحيحة",
+        "created": "تمت الإضافة بنجاح", "updated": "تم حفظ التعديلات", "deleted": "تم الحذف",
+        "confirm_delete": "هل تريد حذف «{display}»؟",
+        "empty_option": "اختر {label}",
+        # field rules: "label: rule" keeps Arabic grammar right for any label (no gender/definiteness agreement)
+        "required": "{label}: هذا الحقل مطلوب",
+        "unique": "{label}: هذه القيمة مستخدمة مسبقًا",
+        "min_length": "{label}: يجب إدخال {n} أحرف على الأقل",
+        "max_length": "{label}: الحد الأقصى {n} حرفًا",
+        "min_value": "{label}: أقل قيمة مسموحة {n}",
+        "max_value": "{label}: أعلى قيمة مسموحة {n}",
+        "pattern": "{label}: الصيغة غير صحيحة",
+        "not_in_past": "{label}: لا يمكن اختيار تاريخ سابق",
+        "not_in_future": "{label}: لا يمكن اختيار تاريخ لاحق",
     },
     "en": {
         "add": "Add {label}", "save": "Save", "cancel": "Cancel", "search": "Search {plural}",
         "form_title": "{label} details", "edit": "Edit", "delete": "Delete",
         "confirm": "Confirm delete", "cancel_delete": "Keep",
-        "empty": "No {plural} yet.", "required": "This field is required", "invalid": "Invalid value",
-        "unique": "This value is already in use", "created": "Added successfully", "updated": "Changes saved",
-        "deleted": "Deleted", "confirm_delete": "Delete “{display}”?",
+        "empty": "No records yet.", "no_results": "No records match your search.",
+        "invalid": "Invalid value",
+        "created": "Added successfully", "updated": "Changes saved", "deleted": "Deleted",
+        "confirm_delete": "Delete “{display}”?",
+        "empty_option": "Select {label}",
+        "required": "{label} is required",
+        "unique": "{label} is already in use",
+        "min_length": "{label} must be at least {n} characters",
+        "max_length": "{label} must be at most {n} characters",
+        "min_value": "{label} must be {n} or more",
+        "max_value": "{label} must be {n} or less",
+        "pattern": "{label} format is invalid",
+        "not_in_past": "{label} cannot be in the past",
+        "not_in_future": "{label} cannot be in the future",
     },
 }
+
+# --- acceptance-criteria text patterns (EN + AR) -----------------------------------------------
+_QUOTE = r"[\"“«]([^\"”»]+)[\"”»]"
+# a quoted text introduced as a message: message "X", the text "X", رسالة "X", نص "X"
+# (one optional word in between: رسالة التأكيد "X", the error message "X")
+_MESSAGE_RE = re.compile(
+    r"(?:message|text|reads|رسالة|الرسالة|النص|نص|عبارة)(?:\s+[^\s\"“«]+)?\s*[:：]?\s*" + _QUOTE,
+    re.IGNORECASE,
+)
+# a quoted button: clicks "X", presses "X", يضغط "X", ينقر "X"
+# Arabic puts the subject between verb and object (يضغط المستخدم "حذف"), so allow up to two words.
+_CLICK_RE = re.compile(
+    r"(?:click(?:s|ing)?(?:\s+on)?|press(?:es)?|taps?|(?:يضغط|ينقر|يختار)(?:\s+[^\s\"“«]+){0,2})\s+" + _QUOTE,
+    re.IGNORECASE,
+)
+_EMPTY_WORDS = re.compile(r"\b(empty|leaves?|clears?|blank|without)\b|فارغ|يترك|يمسح|بدون|دون", re.IGNORECASE)
+_NO_RECORDS = re.compile(r"no (records|items|\w+ yet)|empty[- ]state|لا توجد|عدم وجود|فارغة", re.IGNORECASE)
+_SEARCH = re.compile(r"search|filter|بحث|تصفية|فلتر", re.IGNORECASE)
+_CONFIRM = re.compile(r"confirm|تأكيد|يؤكد", re.IGNORECASE)
 
 
 class ArchitectureError(ValueError):
@@ -55,6 +104,10 @@ def snake(name: str) -> str:
 def humanize(value: str) -> str:
     text = value.replace("_", " ").replace("-", " ").strip()
     return text[:1].upper() + text[1:]
+
+
+def _num(value: float) -> str:
+    return str(int(value)) if float(value).is_integer() else str(value)
 
 
 def _check_input(req: Dict[str, Any]) -> List[str]:
@@ -79,7 +132,24 @@ def _check_input(req: Dict[str, Any]) -> List[str]:
     return reasons
 
 
-def _field(f: Dict[str, Any], list_fields: List[str], language: str, warnings: List[str]) -> Dict[str, Any]:
+def _field_messages(f: Dict[str, Any], v: Dict[str, Any], t: Dict[str, str]) -> Dict[str, str]:
+    label = f["label"]
+    out: Dict[str, str] = {}
+    if f["required"]:
+        out["required"] = t["required"].format(label=label)
+    if f.get("unique"):
+        out["unique"] = t["unique"].format(label=label)
+    for rule in ("min_length", "max_length", "min_value", "max_value"):
+        if rule in v:
+            out[rule] = t[rule].format(label=label, n=_num(v[rule]))
+    if "pattern" in v:
+        out["pattern"] = t["pattern"].format(label=label)
+    if "date_constraint" in v:
+        out["date_constraint"] = t[v["date_constraint"]].format(label=label)
+    return out
+
+
+def _field(f: Dict[str, Any], list_fields: List[str], language: str, t: Dict[str, str], warnings: List[str]) -> Dict[str, Any]:
     v = {k: val for k, val in (f.get("validation") or {}).items() if val is not None}
     out: Dict[str, Any] = {
         "name": f["name"],
@@ -90,19 +160,117 @@ def _field(f: Dict[str, Any], list_fields: List[str], language: str, warnings: L
         "unique": f.get("unique", False),
         "show_in_list": f["name"] in list_fields,
         "validation": v,
+        "messages": _field_messages(f, v, t),
     }
     if f.get("default") is not None:
         out["default"] = f["default"]
     if f["type"] in NUMBER_TYPES:
-        out["step"] = 1 if f["type"] == "integer" else 0.01
+        decimals = 0 if f["type"] == "integer" else 2
+        out["step"] = 1 if decimals == 0 else 0.01
+        out["display_format"] = {"decimals": decimals}
     if f["type"] == "enum":
-        out["options"] = [{"value": val, "label": humanize(val)} for val in f["enum_values"]]
-        if language == "ar":
+        ascii_values = [val for val in f["enum_values"] if val.isascii()]
+        out["options"] = [
+            {"value": val, "label": humanize(val) if val.isascii() else val} for val in f["enum_values"]
+        ]
+        if f.get("default") is None:
+            out["empty_option"] = t["empty_option"].format(label=f["label"])
+        if language == "ar" and ascii_values:
             warnings.append(
-                f"enum labels for '{f['name']}' were generated from English values {f['enum_values']}; "
+                f"enum labels for '{f['name']}' were generated from English values {ascii_values}; "
                 "requirements.json should provide Arabic display labels"
             )
     return out
+
+
+def _label_in(text: str, fields: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """The field whose label the text quotes ("Client name" / «اسم العميل»). Unquoted words never count,
+    so a business rule like 'a booking for the same date' is not mistaken for the Date field."""
+    quoted = set(re.findall(_QUOTE, text))
+    hits = [f for f in fields if f["label"] in quoted]
+    return max(hits, key=lambda f: len(f["label"])) if hits else None
+
+
+def _validation_rule(when: str, field: Dict[str, Any]) -> Optional[str]:
+    """Which rule a validation AC exercises, from its 'when' text."""
+    rules = list(field["messages"].keys())
+    if _EMPTY_WORDS.search(when) and "required" in rules:
+        return "required"
+    others = [r for r in rules if r != "required"]
+    if len(others) == 1:
+        return others[0]
+    v = field["validation"]
+    number = re.search(r"-?\d+(?:\.\d+)?", when)
+    if number:
+        n = float(number.group())
+        if "min_value" in v and n < v["min_value"]:
+            return "min_value"
+        if "max_value" in v and n > v["max_value"]:
+            return "max_value"
+        if "min_length" in v and n < v["min_length"]:
+            return "min_length"
+        if "max_length" in v and n > v["max_length"]:
+            return "max_length"
+    return None
+
+
+def _apply_acceptance_criteria(req: Dict[str, Any], doc: Dict[str, Any], warnings: List[str]) -> List[Dict[str, str]]:
+    """Copy texts the acceptance criteria quote literally (rule M1). Returns verbatim_messages."""
+    fields = doc["entity"]["fields"]
+    by_name = {f["name"]: f for f in fields}
+    form_screen = doc["screens"][1]["components"]
+    verbatim: List[Dict[str, str]] = []
+
+    def take(path: str, text: str, source: str) -> None:
+        if any(vm["path"] == path for vm in verbatim):
+            return  # first criterion wins
+        verbatim.append({"path": path, "text": text, "source": source})
+
+    save_clicks: Counter = Counter()
+    for ac in req.get("acceptance_criteria", []):
+        cat, when, then, ac_id = ac["category"], ac["when"], ac["then"], ac["id"]
+        clicks = _CLICK_RE.findall(when)
+        if cat in ("create", "update", "validation") and clicks:
+            save_clicks.update([clicks[-1]])
+        if cat == "delete" and clicks:
+            take("messages.delete_button", clicks[0], ac_id)
+            doc["messages"]["delete_button"] = clicks[0]
+            if len(clicks) > 1 and _CONFIRM.search(when):
+                take("messages.confirm_button", clicks[1], ac_id)
+                doc["messages"]["confirm_button"] = clicks[1]
+
+        quoted = _MESSAGE_RE.findall(then)
+        if not quoted:
+            continue
+        text = quoted[0]
+        if cat == "read":
+            key = "no_results" if _SEARCH.search(when) else "empty" if _NO_RECORDS.search(then + " " + text) else None
+            if key:
+                doc["messages"][key] = text
+                take(f"messages.{key}", text, ac_id)
+        elif cat == "delete" and _CONFIRM.search(then + " " + when):
+            doc["messages"]["confirm_delete"] = text
+            take("messages.confirm_delete", text, ac_id)
+        elif cat == "validation":
+            rest = re.sub(r"[\"“«]" + re.escape(text) + r"[\"”»]", " ", then)
+            field = _label_in(rest, fields) or _label_in(when, fields)
+            rule = _validation_rule(when, field) if field else None
+            if field and rule:
+                by_name[field["name"]]["messages"][rule] = text
+                take(f"entity.fields.{field['name']}.messages.{rule}", text, ac_id)
+            else:
+                warnings.append(
+                    f"{ac_id} quotes the message “{text}” but it is not tied to one field rule (likely a business "
+                    "rule such as no double booking); the MVP template cannot show it"
+                )
+
+    if save_clicks:
+        label, _ = save_clicks.most_common(1)[0]
+        button = next(c for c in form_screen if c["type"] == "save_button")
+        button["label"] = label
+        take("screens.form.save_button", label, next(
+            ac["id"] for ac in req.get("acceptance_criteria", []) if label in _CLICK_RE.findall(ac["when"])))
+    return verbatim
 
 
 def build_architecture(req: Dict[str, Any]) -> Dict[str, Any]:
@@ -117,7 +285,7 @@ def build_architecture(req: Dict[str, Any]) -> Dict[str, Any]:
     read = e["crud"]["read"]
     list_fields = read.get("list_fields") or [e["display_field"]]
     warnings: List[str] = []
-    fields = [_field(f, list_fields, language, warnings) for f in e["fields"]]
+    fields = [_field(f, list_fields, language, t, warnings) for f in e["fields"]]
     by_name = {f["name"]: f for f in fields}
     fmt = {"label": e["label"], "plural": e["plural_label"]}
 
@@ -145,7 +313,7 @@ def build_architecture(req: Dict[str, Any]) -> Dict[str, Any]:
         if r["category"] == "other"
     ]
 
-    doc = {
+    doc: Dict[str, Any] = {
         "app": {
             "name": req["app"]["name"],
             "description": req["app"].get("description", ""),
@@ -185,13 +353,14 @@ def build_architecture(req: Dict[str, Any]) -> Dict[str, Any]:
             "delete_confirmation": "inline" if e["crud"]["delete"].get("requires_confirmation", True) else "none",
         },
         "messages": {
-            "empty": t["empty"].format(**fmt), "required": t["required"], "invalid": t["invalid"],
-            "unique": t["unique"], "created": t["created"], "updated": t["updated"], "deleted": t["deleted"],
+            "empty": t["empty"].format(**fmt), "no_results": t["no_results"], "invalid": t["invalid"],
+            "created": t["created"], "updated": t["updated"], "deleted": t["deleted"],
             "confirm_delete": t["confirm_delete"], "confirm_button": t["confirm"],
             "cancel_delete_button": t["cancel_delete"], "edit_button": t["edit"], "delete_button": t["delete"],
         },
         "deferred_rules": deferred,
         "warnings": warnings,
     }
+    doc["verbatim_messages"] = _apply_acceptance_criteria(req, doc, warnings)
     # Validation is the contract: if this raises, the mapping above has a bug.
     return ArchitectureDocument.model_validate(doc).model_dump(mode="json", by_alias=True, exclude_none=True)
