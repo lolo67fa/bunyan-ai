@@ -59,6 +59,8 @@ Output rules:
 7. Acceptance criteria use Given / When / Then with concrete, observable values that an automated
    browser test can check (exact field values, record counts, visible messages, state after reload).
    Never use vague words such as fast, easy, user-friendly, intuitive, properly, سهل, سريع.
+   For "missing required fields", list only required fields WITHOUT a default and that are not booleans:
+   a field with a default is pre-filled in the form, so it can never show a required-field error.
    Cover: successful create, missing required fields, each validation rule, persistence after reload,
    list/search, edit, delete with confirmation and cancelled delete.
 8. status:
