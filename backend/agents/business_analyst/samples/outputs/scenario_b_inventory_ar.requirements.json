@@ -1,0 +1,336 @@
+{
+  "schema_version": "0.1.0-proposal",
+  "status": "ready_for_review",
+  "language": "ar",
+  "source_idea": "أبغى موقع لإدارة المخزون أقدر أضيف فيه المنتجات وأعدل كمياتها وأسعارها وأحذف المنتجات وأعرض قائمة المخزون.",
+  "app": {
+    "name": "مدير المخزون",
+    "description": "تطبيق ويب لمتجر صغير لتسجيل المنتجات مع كمياتها وأسعارها وتعديلها وحذفها.",
+    "target_users": [
+      "أصحاب المتاجر الصغيرة",
+      "أمناء المستودعات"
+    ]
+  },
+  "entities": [
+    {
+      "name": "Product",
+      "label": "منتج",
+      "plural_label": "المنتجات",
+      "description": "منتج موجود في المخزون.",
+      "display_field": "name",
+      "fields": [
+        {
+          "name": "name",
+          "label": "اسم المنتج",
+          "type": "string",
+          "required": true,
+          "unique": false,
+          "description": "",
+          "enum_values": null,
+          "reference_entity": null,
+          "default": null,
+          "validation": {
+            "min_length": 2,
+            "max_length": 100,
+            "min_value": null,
+            "max_value": null,
+            "pattern": null,
+            "date_constraint": null
+          }
+        },
+        {
+          "name": "quantity",
+          "label": "الكمية",
+          "type": "integer",
+          "required": true,
+          "unique": false,
+          "description": "",
+          "enum_values": null,
+          "reference_entity": null,
+          "default": 0,
+          "validation": {
+            "min_length": null,
+            "max_length": null,
+            "min_value": 0.0,
+            "max_value": null,
+            "pattern": null,
+            "date_constraint": null
+          }
+        },
+        {
+          "name": "price",
+          "label": "السعر",
+          "type": "decimal",
+          "required": true,
+          "unique": false,
+          "description": "",
+          "enum_values": null,
+          "reference_entity": null,
+          "default": null,
+          "validation": {
+            "min_length": null,
+            "max_length": null,
+            "min_value": 0.0,
+            "max_value": null,
+            "pattern": null,
+            "date_constraint": null
+          }
+        }
+      ],
+      "crud": {
+        "create": {
+          "enabled": true,
+          "details": ""
+        },
+        "read": {
+          "enabled": true,
+          "details": "",
+          "list_fields": [
+            "name",
+            "quantity",
+            "price"
+          ],
+          "search_fields": [
+            "name"
+          ],
+          "filter_fields": [],
+          "sort_field": "name",
+          "sort_direction": "asc"
+        },
+        "update": {
+          "enabled": true,
+          "details": ""
+        },
+        "delete": {
+          "enabled": true,
+          "details": "",
+          "requires_confirmation": true
+        }
+      }
+    }
+  ],
+  "functional_requirements": [
+    {
+      "id": "FR-1",
+      "entity": "Product",
+      "category": "create",
+      "description": "يجب أن يسمح النظام للمستخدم بإنشاء منتج بإدخال: اسم المنتج، الكمية، السعر.",
+      "priority": "must"
+    },
+    {
+      "id": "FR-2",
+      "entity": "Product",
+      "category": "read",
+      "description": "يجب أن يعرض النظام جميع المنتجات في قائمة تظهر اسم المنتج، الكمية، السعر مرتبة حسب اسم المنتج مع البحث حسب اسم المنتج.",
+      "priority": "must"
+    },
+    {
+      "id": "FR-3",
+      "entity": "Product",
+      "category": "update",
+      "description": "يجب أن يسمح النظام للمستخدم بتعديل أي حقل في سجل موجود من المنتجات وحفظ التعديلات.",
+      "priority": "must"
+    },
+    {
+      "id": "FR-4",
+      "entity": "Product",
+      "category": "delete",
+      "description": "يجب أن يسمح النظام للمستخدم بحذف منتج بعد تأكيد العملية في نافذة تأكيد.",
+      "priority": "must"
+    },
+    {
+      "id": "FR-5",
+      "entity": "Product",
+      "category": "validation",
+      "description": "يجب أن يرفض النظام حفظ منتج ما لم: يُدخل اسم المنتج، يحتوي اسم المنتج على 2 أحرف على الأقل، لا يتجاوز اسم المنتج 100 حرفاً، يُدخل الكمية، لا تقل قيمة الكمية عن 0، يُدخل السعر، لا تقل قيمة السعر عن 0.",
+      "priority": "must"
+    },
+    {
+      "id": "FR-6",
+      "entity": null,
+      "category": "persistence",
+      "description": "يجب أن يحفظ النظام جميع السجلات في localStorage في المتصفح بحيث تبقى بعد إعادة تحميل الصفحة.",
+      "priority": "must"
+    }
+  ],
+  "user_stories": [
+    {
+      "id": "US-1",
+      "role": "صاحب المتجر",
+      "goal": "أضيف سجلاً جديداً إلى المنتجات",
+      "benefit": "أحتفظ بالبيانات في مكان واحد",
+      "entity": "Product",
+      "operation": "create",
+      "requirement_ids": [
+        "FR-1",
+        "FR-5",
+        "FR-6"
+      ]
+    },
+    {
+      "id": "US-2",
+      "role": "صاحب المتجر",
+      "goal": "أعرض قائمة المنتجات وأبحث فيها",
+      "benefit": "أجد السجل الذي أحتاجه",
+      "entity": "Product",
+      "operation": "read",
+      "requirement_ids": [
+        "FR-2"
+      ]
+    },
+    {
+      "id": "US-3",
+      "role": "صاحب المتجر",
+      "goal": "أعدّل سجلاً موجوداً في المنتجات",
+      "benefit": "تبقى البيانات صحيحة ومحدّثة",
+      "entity": "Product",
+      "operation": "update",
+      "requirement_ids": [
+        "FR-3",
+        "FR-5"
+      ]
+    },
+    {
+      "id": "US-4",
+      "role": "صاحب المتجر",
+      "goal": "أحذف سجلاً لم أعد أحتاجه من المنتجات",
+      "benefit": "تحتوي القائمة على السجلات المهمة فقط",
+      "entity": "Product",
+      "operation": "delete",
+      "requirement_ids": [
+        "FR-4"
+      ]
+    }
+  ],
+  "acceptance_criteria": [
+    {
+      "id": "AC-1",
+      "story_id": "US-1",
+      "category": "create",
+      "given": "قائمة المنتجات مفتوحة وتحتوي على N سجل",
+      "when": "يُدخل المستخدم اسم المنتج = \"مياه معدنية 330 مل\"، الكمية = \"24\"، السعر = \"2.50\" ويضغط \"حفظ\"",
+      "then": "يظهر سجل جديد باسم \"مياه معدنية 330 مل\" في قائمة المنتجات ويصبح عدد السجلات N + 1"
+    },
+    {
+      "id": "AC-2",
+      "story_id": "US-1",
+      "category": "validation",
+      "given": "نموذج الإضافة في المنتجات مفتوح",
+      "when": "يترك المستخدم جميع الحقول فارغة ويضغط \"حفظ\"",
+      "then": "لا يُحفظ أي سجل وتظهر رسالة خطأ بجانب كل حقل إلزامي: اسم المنتج، الكمية، السعر"
+    },
+    {
+      "id": "AC-3",
+      "story_id": "US-1",
+      "category": "validation",
+      "given": "نموذج الإضافة في المنتجات مفتوح وجميع الحقول الأخرى صحيحة",
+      "when": "يُدخل المستخدم القيمة \"م\" المكونة من حرف واحد في \"اسم المنتج\" ويضغط \"حفظ\"",
+      "then": "لا يُحفظ السجل وتظهر رسالة خطأ بجانب \"اسم المنتج\""
+    },
+    {
+      "id": "AC-4",
+      "story_id": "US-1",
+      "category": "validation",
+      "given": "نموذج الإضافة في المنتجات مفتوح وجميع الحقول الأخرى صحيحة",
+      "when": "يُدخل المستخدم القيمة -1 في \"الكمية\" ويضغط \"حفظ\"",
+      "then": "لا يُحفظ السجل وتظهر رسالة خطأ بجانب \"الكمية\""
+    },
+    {
+      "id": "AC-5",
+      "story_id": "US-1",
+      "category": "validation",
+      "given": "نموذج الإضافة في المنتجات مفتوح وجميع الحقول الأخرى صحيحة",
+      "when": "يُدخل المستخدم القيمة -5 في \"السعر\" ويضغط \"حفظ\"",
+      "then": "لا يُحفظ السجل وتظهر رسالة خطأ بجانب \"السعر\""
+    },
+    {
+      "id": "AC-6",
+      "story_id": "US-1",
+      "category": "persistence",
+      "given": "تمت إضافة سجل باسم \"مياه معدنية 330 مل\" إلى المنتجات",
+      "when": "يعيد المستخدم تحميل الصفحة",
+      "then": "يبقى \"مياه معدنية 330 مل\" ظاهراً في قائمة المنتجات بنفس القيم"
+    },
+    {
+      "id": "AC-7",
+      "story_id": "US-2",
+      "category": "read",
+      "given": "تمت إضافة 3 سجلات إلى المنتجات",
+      "when": "يفتح المستخدم قائمة المنتجات",
+      "then": "تظهر 3 صفوف بالضبط، يحتوي كل منها على الأعمدة اسم المنتج، الكمية، السعر"
+    },
+    {
+      "id": "AC-8",
+      "story_id": "US-2",
+      "category": "read",
+      "given": "لا توجد سجلات في المنتجات",
+      "when": "يفتح المستخدم قائمة المنتجات",
+      "then": "تظهر رسالة تفيد بعدم وجود سجلات بدلاً من القائمة"
+    },
+    {
+      "id": "AC-9",
+      "story_id": "US-2",
+      "category": "read",
+      "given": "يوجد في المنتجات سجلان باسم \"مياه معدنية 330 مل\" و\"سجل آخر\"",
+      "when": "يكتب المستخدم \"مياه معدنية 330 مل\" في مربع البحث",
+      "then": "يظهر السجل \"مياه معدنية 330 مل\" فقط في القائمة"
+    },
+    {
+      "id": "AC-10",
+      "story_id": "US-3",
+      "category": "update",
+      "given": "يوجد في المنتجات سجل باسم \"مياه معدنية 330 مل\"",
+      "when": "يغير المستخدم اسم المنتج إلى \"مياه معدنية 330 مل (معدل)\" ويضغط \"حفظ\" ثم يعيد تحميل الصفحة",
+      "then": "تعرض القائمة \"مياه معدنية 330 مل (معدل)\" ولا تعرض \"مياه معدنية 330 مل\""
+    },
+    {
+      "id": "AC-11",
+      "story_id": "US-3",
+      "category": "validation",
+      "given": "يوجد في المنتجات سجل باسم \"مياه معدنية 330 مل\"",
+      "when": "يمسح المستخدم اسم المنتج في نموذج التعديل ويضغط \"حفظ\"",
+      "then": "لا يُحفظ التعديل وتظهر رسالة خطأ ويبقى \"مياه معدنية 330 مل\" في القائمة"
+    },
+    {
+      "id": "AC-12",
+      "story_id": "US-4",
+      "category": "delete",
+      "given": "يوجد في المنتجات سجل باسم \"مياه معدنية 330 مل\" وتعرض القائمة N سجل",
+      "when": "يضغط المستخدم \"حذف\" عليه ثم يؤكد",
+      "then": "يُزال \"مياه معدنية 330 مل\" من القائمة ويصبح العدد N - 1 ويبقى غير موجود بعد إعادة تحميل الصفحة"
+    },
+    {
+      "id": "AC-13",
+      "story_id": "US-4",
+      "category": "delete",
+      "given": "يوجد في المنتجات سجل باسم \"مياه معدنية 330 مل\"",
+      "when": "يضغط المستخدم \"حذف\" عليه ثم يلغي التأكيد",
+      "then": "يبقى \"مياه معدنية 330 مل\" ظاهراً في القائمة"
+    }
+  ],
+  "clarification_questions": [
+    {
+      "id": "Q-1",
+      "question": "هل تريد تصنيف المنتجات ضمن فئات؟",
+      "reason": "إضافة الفئات تعني كياناً ثانياً.",
+      "blocking": false,
+      "options": [],
+      "suggested_default": "بدون فئات في النسخة الأولى."
+    },
+    {
+      "id": "Q-2",
+      "question": "هل تريد تمييز المنتجات التي قلّت كميتها في القائمة؟",
+      "reason": "تنبيه انخفاض المخزون يحتاج إلى حد لكل منتج.",
+      "blocking": false,
+      "options": [],
+      "suggested_default": "بدون تمييز لانخفاض المخزون في النسخة الأولى."
+    }
+  ],
+  "assumptions": [
+    "يستخدم التطبيق شخص واحد في متصفح واحد؛ وتُحفظ البيانات في localStorage.",
+    "يحصل كل سجل تلقائياً على حقول النظام id و created_at و updated_at.",
+    "لا يتم تتبع حركات المخزون (سجل المشتريات والمبيعات)؛ يعدّل المستخدم الكمية مباشرة.",
+    "الأسعار أرقام فقط ولا يتم حفظ العملة."
+  ],
+  "out_of_scope": []
+}
