@@ -1,5 +1,5 @@
 from typing import List, Dict
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, StrictBool, ConfigDict, field_validator, model_validator
 
 
 class ProjectRequest(BaseModel):
@@ -15,7 +15,9 @@ class ProjectRequest(BaseModel):
 
 
 class ApprovalRequest(BaseModel):
-    approved: bool = True
+    model_config = ConfigDict(extra="forbid")
+
+    approved: StrictBool
     feedback: str = ""
 
     @field_validator("feedback")
@@ -23,9 +25,24 @@ class ApprovalRequest(BaseModel):
     def clean_feedback(cls, value):
         return value.strip()
 
+    @model_validator(mode="after")
+    def validate_feedback(self):
+        if not self.approved and len(self.feedback) < 3:
+            raise ValueError("Feedback must be at least 3 characters")
+        return self
+
+
+
 
 class AnswersRequest(BaseModel):
     answers: Dict[str, str]
+
+    @field_validator("answers")
+    @classmethod
+    def validate_answers(cls, answers):
+        if any(len(value) > 1000 for value in answers.values()):
+            raise ValueError("Each answer must be at most 1000 characters")
+        return answers
 
 
 class RequirementModel(BaseModel):

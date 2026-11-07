@@ -79,3 +79,44 @@ def test_feedback_required(client):
     project = create(client)
     response = client.post(f'/projects/{project["project_id"]}/approve', json={"approved": False})
     assert response.status_code == 422
+@pytest.mark.parametrize("payload", [
+    {},
+    {"wrong_field": True},
+    {"approved": "true"},
+    {"approved": 1},
+    {"approved": False, "feedback": "ab"},
+    {"approved": False, "feedback": "   "}
+])
+def test_invalid_approval(client, payload):
+    project = create(client)
+    project_id = project["project_id"]
+
+    response = client.post(
+        f"/projects/{project_id}/approve",
+        json=payload
+    )
+
+    assert response.status_code == 422
+
+    saved = client.get(f"/projects/{project_id}").json()
+    assert saved["status"] == "awaiting_approval"
+
+
+def test_answer_too_long(client):
+    project = create(client)
+    project_id = project["project_id"]
+
+    saved = main.load_project(project_id)
+    saved["status"] = "awaiting_clarification"
+    main.save_project(saved)
+
+    response = client.post(
+        f"/projects/{project_id}/answers",
+        json={"answers": {"Q-1": "a" * 1001}}
+    )
+
+    assert response.status_code == 422
+
+    saved = client.get(f"/projects/{project_id}").json()
+    assert saved["status"] == "awaiting_clarification"
+    assert saved["error"] is None
