@@ -47,6 +47,7 @@ export default function RequirementsReview({ project, onDone }) {
   const [feedback, setFeedback] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
+  const [sentFeedback, setSentFeedback] = useState('');
 
   async function send(approved) {
     if (!approved && feedback.trim().length < 3) {
@@ -56,7 +57,14 @@ export default function RequirementsReview({ project, onDone }) {
     setSending(true);
     setError('');
     try {
-      onDone(await approveRequirements(project.id, { approved, feedback: feedback.trim() }));
+      const updated = await approveRequirements(project.project_id, { approved, feedback: feedback.trim() });
+      if (!approved) {
+        // The analyst returned revised requirements: go back to review so they can be approved.
+        setSentFeedback(feedback.trim());
+        setFeedback('');
+        setMode('review');
+      }
+      onDone(updated);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -178,6 +186,12 @@ export default function RequirementsReview({ project, onDone }) {
           <h3>ميزات خارج النطاق</h3>
           <OutOfScopeList items={req.out_of_scope} dir={dir} />
         </>
+      )}
+
+      {sentFeedback && mode === 'review' && (
+        <p className="notice" data-testid="feedback-sent">
+          أُرسلت تعديلاتك للمحلل وهذي المتطلبات بعد المراجعة: «{sentFeedback}»
+        </p>
       )}
 
       {mode === 'feedback' && (

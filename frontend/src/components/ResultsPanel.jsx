@@ -8,16 +8,16 @@ export default function ResultsPanel({ project }) {
 
   useEffect(() => {
     let alive = true;
-    getPreviewHtml(project.id)
+    getPreviewHtml(project.project_id)
       .then((h) => alive && setHtml(h))
       .catch(() => alive && setHtml(null));
     return () => {
       alive = false;
     };
-  }, [project.id]);
+  }, [project.project_id]);
 
-  const src = previewUrl(project.id);
-  const zip = downloadUrl(project.id);
+  const src = previewUrl(project.project_id);
+  const zip = downloadUrl(project.project_id);
   const passed = m && m.checks_passed === m.checks_total;
 
   return (

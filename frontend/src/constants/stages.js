@@ -1,9 +1,12 @@
-// Workflow states, taken from docs/architecture.md §6 (proposed — confirm with Alanoud).
+// Workflow states: docs/architecture.md §6 plus the two the backend uses in PR #5
+// ("rejected" for out-of-scope ideas, "approved" until the Architect is wired in).
 export const STATUS = {
   CREATED: 'created',
   ANALYZING: 'analyzing',
   AWAITING_CLARIFICATION: 'awaiting_clarification',
   AWAITING_APPROVAL: 'awaiting_approval',
+  APPROVED: 'approved',
+  REJECTED: 'rejected',
   DESIGNING: 'designing',
   DEVELOPING: 'developing',
   TESTING: 'testing',
@@ -18,6 +21,8 @@ export const STATUS_LABELS = {
   analyzing: 'تحليل الفكرة',
   awaiting_clarification: 'بانتظار إجاباتك',
   awaiting_approval: 'بانتظار موافقتك',
+  approved: 'تمت الموافقة',
+  rejected: 'خارج النطاق',
   designing: 'تصميم الهيكلة',
   developing: 'توليد الكود',
   testing: 'اختبار التطبيق',
@@ -69,7 +74,7 @@ export const AGENTS = [
 // States where the run is waiting for the user — polling can stop.
 export const WAITING_STATES = ['awaiting_clarification', 'awaiting_approval'];
 // States where the run is over — polling stops.
-export const TERMINAL_STATES = ['completed', 'failed'];
+export const TERMINAL_STATES = ['completed', 'failed', 'rejected'];
 
 /**
  * Returns 'done' | 'active' | 'waiting' | 'failed' | 'pending' for one agent,
@@ -78,6 +83,10 @@ export const TERMINAL_STATES = ['completed', 'failed'];
 export function agentState(agentIndex, project) {
   const { status, current_agent: currentAgent } = project;
   if (status === 'completed') return 'done';
+  // Analyst finished and the user approved; the next agent has not started yet.
+  if (status === 'approved') return agentIndex === 0 ? 'done' : 'pending';
+  // Out of scope: the analyst stopped the run.
+  if (status === 'rejected') return agentIndex === 0 ? 'failed' : 'pending';
 
   const activeIndex = AGENTS.findIndex((a) =>
     currentAgent ? a.key === currentAgent : a.states.includes(status),

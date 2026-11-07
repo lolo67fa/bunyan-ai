@@ -40,8 +40,11 @@ export default function ProjectPage({ id }) {
   }
 
   const req = project.requirements;
-  const outOfScope = req?.status === 'rejected_out_of_scope';
-  const working = !['awaiting_clarification', 'awaiting_approval', 'completed', 'failed'].includes(project.status);
+  const outOfScope = project.status === 'rejected' || req?.status === 'rejected_out_of_scope';
+  const stopped = project.status === 'failed' || project.status === 'rejected';
+  const working = !['awaiting_clarification', 'awaiting_approval', 'approved', 'completed', 'failed', 'rejected'].includes(
+    project.status,
+  );
   const anyArtifact = project.artifacts?.some((a) => a.available);
 
   return (
@@ -67,11 +70,17 @@ export default function ProjectPage({ id }) {
 
       {project.status === 'awaiting_approval' && req && <RequirementsReview project={project} onDone={resume} />}
 
-      {project.status === 'failed' && (
+      {project.status === 'approved' && (
+        <p className="working" aria-live="polite" data-testid="approved">
+          <span className="spinner" aria-hidden="true" /> تمت الموافقة على المتطلبات، بانتظار بدء التصميم…
+        </p>
+      )}
+
+      {stopped && (
         <section className="card" data-testid="failed">
           <h2>{outOfScope ? 'الفكرة خارج نطاق النسخة الأولى' : 'توقف التشغيل'}</h2>
           {!outOfScope && project.error?.message && <p className="alert alert-error">{project.error.message}</p>}
-          {outOfScope && (
+          {outOfScope && req && (
             <>
               <p className="muted">بنيان يبني حالياً تطبيقات ويب للإضافة والعرض والتعديل والحذف فقط.</p>
               <OutOfScopeList items={req.out_of_scope} dir={req.language === 'ar' ? 'rtl' : 'ltr'} />

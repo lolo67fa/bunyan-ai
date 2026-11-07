@@ -22,7 +22,7 @@ export default function IdeaPage() {
     setError('');
     try {
       const project = await createProject(text);
-      goToProject(project.id);
+      goToProject(project.project_id);
     } catch (err) {
       setError(err.message);
       setSending(false);

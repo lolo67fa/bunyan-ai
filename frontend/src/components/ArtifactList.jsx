@@ -29,7 +29,7 @@ export default function ArtifactList({ project }) {
     setBusy(name);
     setError('');
     try {
-      const text = await getArtifactText(project.id, name);
+      const text = await getArtifactText(project.project_id, name);
       if (action === 'view') setOpen({ name, text });
       else saveFile(name, text);
     } catch (e) {

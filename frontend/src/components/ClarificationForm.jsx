@@ -39,7 +39,7 @@ export default function ClarificationForm({ project, onSubmitted }) {
     setSending(true);
     setServerError('');
     try {
-      onSubmitted(await submitAnswers(project.id, answers));
+      onSubmitted(await submitAnswers(project.project_id, answers));
     } catch (err) {
       setServerError(err.message);
     } finally {
