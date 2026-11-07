@@ -4,7 +4,7 @@
 
 **Tuwaiq Club — King Saud University**
 
-> **Status:** Initial development stage (Week 1 of 4). The repository currently contains the project structure and documentation. Implementation will be added by each team member on their feature branch.
+> **Status:** Initial development stage (Week 3 of 4). The repository currently contains the project structure and documentation. Implementation will be added by each team member on their feature branch.
 
 ---
 
