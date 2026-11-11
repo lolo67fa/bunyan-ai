@@ -1,20 +1,26 @@
-// The fixed QA suite: 8 checks, parameterised by requirements.json.
-// No test is generated per app. Element names follow the data-testid rules in
-// Naifah's architecture contract (0.2.0-proposal, §5):
+// The fixed QA suite: 8 checks, parameterised by requirements.json and, when
+// given, architecture.json. No test is generated per app. Element names follow
+// the data-testid rules in Naifah's architecture contract (0.3.0-proposal, §5):
 //   btn-add, btn-save, btn-cancel, input-<field>, error-<field>,
 //   records-table, record-row (data-id), cell-<field>, btn-edit, btn-delete,
-//   btn-confirm-delete, btn-cancel-delete, empty-state, toast.
+//   btn-confirm-delete, btn-cancel-delete, confirm-delete-text, empty-state, toast.
+//
+// Messages follow rule M1 (architecture §6): texts listed in verbatim_messages are
+// compared exactly; every other message is only checked to be visible.
 
 const { test, expect } = require('@playwright/test');
-const { loadRequirements, buildPlan, recordValues } = require('../lib/requirements');
+const { loadRequirements, loadArchitecture, buildPlan, recordValues } = require('../lib/requirements');
 
 const APP_PATH = process.env.APP_PATH || '/';
 
 let plan;
+let hasArchitecture = false;
 
 test.beforeAll(() => {
   const { entity } = loadRequirements();
-  plan = buildPlan(entity);
+  const arch = loadArchitecture(entity.name);
+  hasArchitecture = arch !== null;
+  plan = buildPlan(entity, arch);
 });
 
 test.beforeEach(() => {
@@ -58,15 +64,38 @@ async function createRecord(page, tag) {
   return values;
 }
 
+/**
+ * Rule M1: if `path` is in verbatim_messages, the element's text must equal it exactly
+ * and the check records which criterion it came from. Otherwise nothing is compared.
+ */
+async function expectVerbatim(locator, path, replace = {}) {
+  const v = plan.verbatim[path];
+  if (!v) return;
+  let text = v.text;
+  for (const [key, value] of Object.entries(replace)) text = text.split(key).join(value);
+  await expect(locator, `${path} must be exactly "${text}" (${v.source})`).toHaveText(text);
+  test.info().annotations.push({ type: 'verbatim', description: JSON.stringify({ path, text, source: v.source }) });
+}
+
+/** Number shown with exactly `decimals` digits after the point (architecture display_format). */
+function decimalsPattern(decimals) {
+  const d = '[0-9\u0660-\u0669]';
+  return new RegExp(`^\\D*-?${d}[${'0-9\u0660-\u0669'},\u066C]*${decimals > 0 ? `[.\u066B]${d}{${decimals}}` : ''}\\D*$`);
+}
+
 /** Leaves every required field empty that can be empty. Returns their names. */
 async function emptyRequiredFields(page) {
   const emptied = [];
-  for (const f of plan.required) {
+  for (const f of plan.emptiable) {
     const input = page.getByTestId(`input-${f.name}`);
     const tag = await input.evaluate((el) => el.tagName.toLowerCase());
     if (tag === 'select') {
       const hasBlank = await input.evaluate((el) => [...el.options].some((o) => o.value === ''));
-      if (!hasBlank) continue; // e.g. enum with a default: there is no empty choice
+      if (!hasBlank) {
+        // architecture 0.3.0: a required select without a default must start empty (empty_option)
+        expect(hasArchitecture, `input-${f.name} has no empty option, so the required check can never fail`).toBe(false);
+        continue;
+      }
       await input.selectOption('');
     } else if ((await input.getAttribute('type')) === 'checkbox') {
       continue;
@@ -83,6 +112,9 @@ async function emptyRequiredFields(page) {
 test('create_item', async ({ page }) => {
   await openApp(page);
   const before = await rows(page).count();
+  await page.getByTestId('btn-add').click();
+  await expectVerbatim(page.getByTestId('btn-save'), 'screens.form.save_button');
+  await page.getByTestId('btn-cancel').click();
   await createRecord(page, 'Create 1');
   await expect(rows(page)).toHaveCount(before + 1);
   await expect(page.getByTestId('btn-add'), 'should return to the list after save').toBeVisible();
@@ -97,6 +129,12 @@ test('list_items', async ({ page }) => {
     const row = rowByDisplay(page, values[plan.display]);
     for (const field of plan.listFields) {
       await expect(row.getByTestId(`cell-${field}`), `row "${values[plan.display]}" should show column ${field}`).toHaveCount(1);
+    }
+    for (const [field, decimals] of Object.entries(plan.formats)) {
+      await expect(
+        row.getByTestId(`cell-${field}`),
+        `${field} must be shown with ${decimals} decimal(s) (display_format)`,
+      ).toHaveText(decimalsPattern(decimals));
     }
   }
 });
@@ -125,7 +163,16 @@ test('delete_item', async ({ page }) => {
   const keep = (await createRecord(page, 'Keep 1'))[plan.display];
   await expect(rows(page)).toHaveCount(2);
 
-  await rowByDisplay(page, target).getByTestId('btn-delete').click();
+  const deleteButton = rowByDisplay(page, target).getByTestId('btn-delete');
+  await expectVerbatim(deleteButton, 'messages.delete_button');
+  await deleteButton.click();
+  if (hasArchitecture) {
+    // architecture 0.3.0 §5: the confirmation shows its text, with {display} replaced
+    const confirmText = page.getByTestId('confirm-delete-text').filter({ visible: true });
+    await expect(confirmText, 'delete confirmation text').toContainText(target);
+    await expectVerbatim(confirmText, 'messages.confirm_delete', { '{display}': target });
+  }
+  await expectVerbatim(page.getByTestId('btn-confirm-delete').filter({ visible: true }), 'messages.confirm_button');
   await page.getByTestId('btn-cancel-delete').filter({ visible: true }).click();
   await expect(rowByDisplay(page, target), 'cancelling delete must keep the record').toHaveCount(1);
 
@@ -147,7 +194,7 @@ test('persist_after_refresh', async ({ page }) => {
 });
 
 test('reject_incomplete_input', async ({ page }) => {
-  test.skip(plan.emptiable.length === 0, 'No required field can be left empty (all required fields are selects with defaults or checkboxes)');
+  test.skip(plan.emptiable.length === 0, 'No required field can be left empty (every required field has a default or is a checkbox)');
   await openApp(page);
   const before = await rows(page).count();
   await page.getByTestId('btn-add').click();
@@ -168,12 +215,13 @@ test('empty_state', async ({ page }) => {
   await expect(rows(page)).toHaveCount(0);
   await expect(page.getByTestId('empty-state')).toBeVisible();
   await expect(page.getByTestId('empty-state')).toHaveText(/\S/);
+  await expectVerbatim(page.getByTestId('empty-state'), 'messages.empty');
   await createRecord(page, 'Empty 1');
   await expect(page.getByTestId('empty-state'), 'empty state should hide once a record exists').toBeHidden();
 });
 
 test('error_message_visible', async ({ page }) => {
-  test.skip(plan.emptiable.length === 0, 'No required field can be left empty (all required fields are selects with defaults or checkboxes)');
+  test.skip(plan.emptiable.length === 0, 'No required field can be left empty (every required field has a default or is a checkbox)');
   await openApp(page);
   await page.getByTestId('btn-add').click();
   const emptied = await emptyRequiredFields(page);
@@ -183,5 +231,6 @@ test('error_message_visible', async ({ page }) => {
     const error = page.getByTestId(`error-${name}`);
     await expect(error, `error message for required field ${name}`).toBeVisible();
     await expect(error, `error message for ${name} should have text`).toHaveText(/\S/);
+    await expectVerbatim(error, `entity.fields.${name}.messages.required`);
   }
 });
