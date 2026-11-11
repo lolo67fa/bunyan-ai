@@ -1,24 +1,39 @@
-"""MVP pipeline: approved requirements -> Architect -> Developer -> stored CRUD app files.
+"""MVP pipeline: approved requirements -> Architect -> Developer -> QA Tester -> stored files.
 
 This module does not know about FastAPI or backend storage. The caller passes the
 project dict, the folder to write into, and a callback that persists the project.
 
-Not included yet: QA, the repair loop, the Project Manager agent, preview and download.
+Not included yet: the repair loop and the Project Manager agent.
 """
 
 from __future__ import annotations
 
 import json
+import os
+import time
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 from backend.agents.architect import ArchitectureError, build_architecture
 from backend.agents.developer import DeveloperError, generate
+from backend.agents.qa_tester.runner import run_qa
+from backend.orchestrator.qa_stage import (
+    QA_BLOCKED,
+    QA_NOT_RUN,
+    TEST_REPORT_FILE,
+    QaBlocked,
+    QaRunner,
+    metrics_from_report,
+    run_qa_stage,
+)
 
 REQUIREMENTS_FILE = "requirements.json"
 ARCHITECTURE_FILE = "architecture.json"
 APP_DIRNAME = "app"
 APP_FILES = ("index.html", "style.css", "app.js")
+
+# Set BUNYAN_QA=off to stop after the Developer (no Node.js or browser needed).
+QA_ENV_VAR = "BUNYAN_QA"
 
 # Placeholder the Developer template replaces with the architecture (templates/crud/app.js).
 _TEMPLATE_PLACEHOLDER = "__BUNYAN_CONFIG__"
@@ -41,8 +56,14 @@ class _StageFailure(Exception):
         self.message = message
 
 
-def run_pipeline(project: dict, workdir: Path, on_update: Callable[[dict], None]) -> dict:
-    """Run Architect then Developer for one approved project and store the files.
+def run_pipeline(
+    project: dict,
+    workdir: Path,
+    on_update: Callable[[dict], None],
+    *,
+    qa_runner: Optional[QaRunner] = None,
+) -> dict:
+    """Run Architect, Developer and QA for one approved project and store the files.
 
     ``project`` is updated in place (existing fields are kept) and returned.
     ``on_update(project)`` is called after every state change so the caller can save it.
@@ -54,19 +75,36 @@ def run_pipeline(project: dict, workdir: Path, on_update: Callable[[dict], None]
         app/index.html
         app/style.css
         app/app.js
+        test_report.json        (when QA ran)
+        qa_evidence/            (screenshots and traces of failed checks)
 
-    The final status is ``completed`` only when all five files exist. Any problem ends
-    with ``status="failed"`` and ``error={"code", "message"}``; the function does not
-    raise for those. It raises ``PipelineNotApproved`` when ``requirements_approved``
-    is not ``True``.
+    QA runs the existing QA Tester once (attempt 0). ``qa_runner`` replaces it in
+    tests; by default it is ``run_qa``, unless the environment has ``BUNYAN_QA=off``,
+    in which case the run stops after the Developer and ``project["qa"]["status"]``
+    is ``"not_run"``.
+
+    How a run ends:
+
+    - ``completed`` with ``qa.status == "passed"``: no check failed.
+    - ``completed`` with ``qa.status == "failed"``: the app was generated and QA found
+      real defects. They are in ``test_report.json`` and in ``metrics``.
+    - ``failed`` with ``error.code`` ``qa_blocked`` or ``qa_failed``: QA could not test
+      the app. The generated files stay available.
+    - ``failed`` with another code: Architect, Developer or storage problem.
+
+    The function does not raise for those. It raises ``PipelineNotApproved`` when
+    ``requirements_approved`` is not ``True``.
     """
     if project.get("requirements_approved") is not True:
         raise PipelineNotApproved("Requirements must be approved by the user before the pipeline runs")
 
+    started = time.monotonic()
     workdir = Path(workdir)
     app_dir = workdir / APP_DIRNAME
     project["error"] = None
     project["artifacts"] = []
+    if qa_runner is None and _qa_enabled():
+        qa_runner = run_qa
 
     try:
         requirements = _checked_requirements(project.get("requirements"))
@@ -79,6 +117,12 @@ def run_pipeline(project: dict, workdir: Path, on_update: Callable[[dict], None]
         _update(project, on_update, workdir, status="developing", current_agent="developer")
         _develop(requirements, architecture, app_dir)
         _check_outputs(workdir)
+
+        if qa_runner is None:
+            project["qa"] = {"status": QA_NOT_RUN, "reason": f"QA is switched off ({QA_ENV_VAR}=off)"}
+        else:
+            _update(project, on_update, workdir, status="testing", current_agent="qa_tester")
+            _test(project, workdir, app_dir, qa_runner, started)
 
         _update(project, on_update, workdir, status="completed", current_agent=None)
     except _StageFailure as failure:
@@ -127,6 +171,26 @@ def _develop(requirements: Dict[str, Any], architecture: Dict[str, Any], app_dir
         raise _StageFailure("generation_failed", f"Developer failed: {_describe(exc)}") from exc
 
 
+def _test(project: dict, workdir: Path, app_dir: Path, qa_runner: QaRunner, started: float) -> None:
+    """Run QA, store its report and put the real numbers on the project."""
+    try:
+        result = run_qa_stage(workdir, app_dir, workdir / REQUIREMENTS_FILE, qa_runner)
+    except QaBlocked as blocked:
+        project["qa"] = {"status": QA_BLOCKED, "reason": blocked.message}
+        if blocked.report is not None:
+            _write_json(workdir / TEST_REPORT_FILE, blocked.report)
+            project["metrics"] = metrics_from_report(blocked.report, time.monotonic() - started)
+        raise _StageFailure(blocked.code, blocked.message) from blocked
+
+    _write_json(workdir / TEST_REPORT_FILE, result.report)
+    project["qa"] = result.summary()
+    project["metrics"] = metrics_from_report(result.report, time.monotonic() - started)
+
+
+def _qa_enabled() -> bool:
+    return os.environ.get(QA_ENV_VAR, "on").strip().lower() not in ("off", "0", "false", "no")
+
+
 def _check_outputs(workdir: Path) -> None:
     """A run is complete only if every expected file is really there."""
     missing = [rel for rel in _expected_files() if not _is_real_file(workdir / rel)]
@@ -157,7 +221,7 @@ def _is_real_file(path: Path) -> bool:
 def _artifacts(workdir: Path) -> List[Dict[str, Any]]:
     """Files that exist right now, in the shape the frontend reads: {"name", "available"}."""
     found = []
-    for rel in _expected_files():
+    for rel in _expected_files() + [TEST_REPORT_FILE]:
         if _is_real_file(workdir / rel):
             found.append({"name": Path(rel).name, "available": True, "path": rel})
     return found

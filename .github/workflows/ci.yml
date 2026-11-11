@@ -39,3 +39,18 @@ jobs:
 
       - name: Test Developer Agent
         run: python tests/smoke_test.py
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install the QA suite (Playwright + Chromium)
+        working-directory: tests/e2e
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Run QA agent tests and real QA on generated apps
+        run: |
+          python -m pytest backend/agents/qa_tester/tests tests/test_qa_pipeline.py -v -rs

@@ -14,7 +14,7 @@ from backend.agents.business_analyst.analyst import analyze
 from backend.orchestrator import run_pipeline
 
 # Statuses in which the generation pipeline is working on a project.
-PIPELINE_STATES = ("designing", "developing")
+PIPELINE_STATES = ("designing", "developing", "testing")
 
 # Sent with every generated file. The generated app is untrusted code served
 # from the backend's own origin, so the preview may only load its own files:
