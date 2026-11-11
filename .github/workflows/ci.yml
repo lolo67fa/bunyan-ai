@@ -29,5 +29,9 @@ jobs:
         run: |
           python -m pytest tests/test_api.py tests/test_api_alignment.py -v
 
+      - name: Run pipeline and storage tests
+        run: |
+          python -m pytest tests/test_pipeline.py tests/test_storage.py tests/test_api_pipeline.py -v
+
       - name: Test Developer Agent
         run: python tests/smoke_test.py

@@ -1,14 +1,33 @@
+import threading
 import uuid
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
-from fastapi import FastAPI, HTTPException
+from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.schemas.contracts import ProjectRequest, ApprovalRequest, AnswersRequest
-from backend.storage import save_project, load_project
+from backend.storage import save_project, load_project, project_dir, list_project_ids
 from backend.agents.business_analyst.analyst import analyze
+from backend.orchestrator import run_pipeline
 
-app = FastAPI(title="Bunyan AI Backend")
+# Statuses in which the generation pipeline is working on a project.
+PIPELINE_STATES = ("designing", "developing")
+
+# Makes "check the status, then start the pipeline" one step, so two approvals
+# sent at the same moment cannot both start a run.
+_approval_lock = threading.Lock()
+_running_lock = threading.Lock()
+_running_projects = set()
+
+
+@asynccontextmanager
+async def lifespan(app):
+    recover_interrupted_projects()
+    yield
+
+
+app = FastAPI(title="Bunyan AI Backend", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -32,6 +51,65 @@ def get_existing_project(project_id):
     if project is None:
         raise HTTPException(status_code=404, detail="Project not found")
     return project
+
+
+def run_generation(project_id):
+    """Background task: Architect -> Developer for one approved project.
+
+    Runs after the approve response has been sent. Every state change is saved
+    through save_with_timestamp. Whatever goes wrong, the project ends in
+    "completed" or "failed", never stuck in a working status.
+    """
+    project_id = str(project_id)
+    with _running_lock:
+        if project_id in _running_projects:
+            return
+        _running_projects.add(project_id)
+    try:
+        project = load_project(project_id)
+        # Only a project that approve_project just moved to "designing" is run.
+        # This also keeps a finished project's files from being generated again.
+        if (
+            project is None
+            or project.get("status") != "designing"
+            or project.get("requirements_approved") is not True
+        ):
+            return
+        try:
+            run_pipeline(project, project_dir(project_id), save_with_timestamp)
+        except Exception as exc:
+            project["status"] = "failed"
+            project["error"] = {
+                "code": "pipeline_failed",
+                "message": f"Generation stopped unexpectedly: {type(exc).__name__}: {exc}",
+            }
+            try:
+                save_with_timestamp(project)
+            except Exception:
+                pass  # storage itself is failing; recover_interrupted_projects handles it on restart
+    finally:
+        with _running_lock:
+            _running_projects.discard(project_id)
+
+
+def recover_interrupted_projects():
+    """Mark runs that were cut off by a server restart as failed.
+
+    Background tasks do not survive a restart, so a project still in a working
+    status at startup would otherwise stay there forever.
+    """
+    recovered = []
+    for project_id in list_project_ids():
+        project = load_project(project_id)
+        if project and project.get("status") in PIPELINE_STATES:
+            project["status"] = "failed"
+            project["error"] = {
+                "code": "pipeline_interrupted",
+                "message": "The server restarted while the application was being generated",
+            }
+            save_with_timestamp(project)
+            recovered.append(project_id)
+    return recovered
 
 
 def run_analysis(project, answers=None, feedback=None):
@@ -90,16 +168,22 @@ def get_project_pipeline(project_id: uuid.UUID):
 
 
 @app.post("/projects/{project_id}/approve")
-def approve_project(project_id: uuid.UUID, data: ApprovalRequest):
-    project = get_existing_project(project_id)
-    if project["status"] != "awaiting_approval":
-        raise HTTPException(status_code=409, detail="Project is not ready for approval")
+def approve_project(project_id: uuid.UUID, data: ApprovalRequest, background_tasks: BackgroundTasks):
+    with _approval_lock:
+        project = get_existing_project(project_id)
+        if project["status"] != "awaiting_approval":
+            raise HTTPException(status_code=409, detail="Project is not ready for approval")
 
-    if data.approved:
-        project["status"] = "approved"
-        project["requirements_approved"] = True
-        save_with_timestamp(project)
-        return project
+        if data.approved:
+            # Move to "designing" before answering, so a second approval gets 409.
+            # The pipeline itself runs after this response has been sent.
+            project["status"] = "designing"
+            project["current_agent"] = "software_architect"
+            project["requirements_approved"] = True
+            project["error"] = None
+            save_with_timestamp(project)
+            background_tasks.add_task(run_generation, project["project_id"])
+            return project
 
     if not data.feedback:
         raise HTTPException(status_code=422, detail="Feedback is required when requesting changes")

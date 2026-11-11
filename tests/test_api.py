@@ -92,11 +92,13 @@ def test_approve_project(client):
     )
 
     assert response.status_code == 200
-    assert response.json()["status"] == "approved"
+    # Approval starts the generation pipeline: the response reports "designing",
+    # and the background run has finished by the next read.
+    assert response.json()["status"] == "designing"
     assert response.json()["requirements_approved"] is True
 
     saved = client.get(f"/projects/{project_id}")
-    assert saved.json()["status"] == "approved"
+    assert saved.json()["status"] == "completed"
 
 
 def test_cannot_approve_twice(client):

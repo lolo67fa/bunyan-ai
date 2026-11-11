@@ -33,7 +33,7 @@ def test_approve_returns_full_project(client):
     response = client.post(f'/projects/{project["project_id"]}/approve', json={"approved": True})
     assert response.status_code == 200
     assert response.json()["idea"] == project["idea"]
-    assert response.json()["status"] == "approved"
+    assert response.json()["status"] == "designing"  # approval starts the pipeline
 
 
 def test_feedback_reanalysis(client, monkeypatch):
