@@ -24,6 +24,7 @@ class Check(BaseModel):
     related_criteria: list[str]
     error: Optional[CheckError] = None
     skip_reason: Optional[str] = None
+    verbatim_compared: list[dict] = []
     evidence: Evidence
 
 
