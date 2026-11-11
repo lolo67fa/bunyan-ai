@@ -33,5 +33,9 @@ jobs:
         run: |
           python -m pytest tests/test_pipeline.py tests/test_storage.py tests/test_api_pipeline.py -v
 
+      - name: Run artifact, preview and download tests
+        run: |
+          python -m pytest tests/test_artifacts_api.py -v
+
       - name: Test Developer Agent
         run: python tests/smoke_test.py

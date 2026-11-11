@@ -179,4 +179,8 @@ def _write_json(path: Path, data: Dict[str, Any]) -> None:
 
 
 def _describe(exc: BaseException) -> str:
+    """Short reason for the user. OS errors are reduced to their reason text
+    because their full message contains absolute paths on the server."""
+    if isinstance(exc, OSError) and exc.strerror:
+        return f"{type(exc).__name__}: {exc.strerror}"
     return f"{type(exc).__name__}: {exc}"

@@ -5,14 +5,28 @@ from datetime import datetime, timezone
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse, Response
 
 from backend.schemas.contracts import ProjectRequest, ApprovalRequest, AnswersRequest
 from backend.storage import save_project, load_project, project_dir, list_project_ids
+from backend import artifacts
 from backend.agents.business_analyst.analyst import analyze
 from backend.orchestrator import run_pipeline
 
 # Statuses in which the generation pipeline is working on a project.
 PIPELINE_STATES = ("designing", "developing")
+
+# Sent with every generated file. The generated app is untrusted code served
+# from the backend's own origin, so the preview may only load its own files:
+# no inline scripts, no requests to this API or to any other host.
+PREVIEW_HEADERS = {
+    "Content-Security-Policy": (
+        "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
+        "base-uri 'none'; form-action 'none'"
+    ),
+    "X-Content-Type-Options": "nosniff",
+    "Cache-Control": "no-store",
+}
 
 # Makes "check the status, then start the pipeline" one step, so two approvals
 # sent at the same moment cannot both start a run.
@@ -200,3 +214,62 @@ def submit_answers(project_id: uuid.UUID, data: AnswersRequest):
         raise HTTPException(status_code=422, detail="At least one non-empty answer is required")
     project["answers"] = data.answers
     return run_analysis(project, answers=data.answers)
+
+
+def file_response(path, name, headers=None):
+    return Response(content=path.read_bytes(), media_type=artifacts.media_type(name), headers=headers)
+
+
+@app.get("/projects/{project_id}/artifacts/{name}")
+def get_artifact(project_id: uuid.UUID, name: str):
+    """One generated file by its artifact name, e.g. architecture.json or app.js."""
+    project = get_existing_project(project_id)
+    path = artifacts.artifact_file(project["project_id"], name)
+    if path is None:
+        raise HTTPException(status_code=404, detail="Artifact not found")
+    return file_response(path, name, {"X-Content-Type-Options": "nosniff", "Cache-Control": "no-store"})
+
+
+@app.get("/projects/{project_id}/preview", include_in_schema=False)
+def redirect_to_preview(project_id: uuid.UUID):
+    """The app links style.css and app.js relatively, so it must be opened at .../preview/."""
+    get_existing_project(project_id)
+    return RedirectResponse(url=f"/projects/{project_id}/preview/", status_code=307)
+
+
+@app.get("/projects/{project_id}/preview/")
+def preview_app(project_id: uuid.UUID):
+    """The generated application's index.html."""
+    return preview_app_file(project_id, "index.html")
+
+
+@app.get("/projects/{project_id}/preview/{filename}")
+def preview_app_file(project_id: uuid.UUID, filename: str):
+    """A file of the generated application: index.html, style.css or app.js."""
+    project = get_existing_project(project_id)
+    path = artifacts.preview_file(project["project_id"], filename)
+    if path is None:
+        raise HTTPException(status_code=404, detail="Preview file not found")
+    return file_response(path, filename, PREVIEW_HEADERS)
+
+
+@app.get("/projects/{project_id}/download")
+def download_project(project_id: uuid.UUID):
+    """ZIP with the generated application and its requirements and architecture."""
+    project = get_existing_project(project_id)
+    missing = artifacts.missing_for_download(project["project_id"])
+    if missing:
+        raise HTTPException(
+            status_code=404,
+            detail=f"The application is not ready for download. Missing: {', '.join(missing)}",
+        )
+    filename = f"bunyan-app-{str(project_id)[:8]}.zip"
+    return Response(
+        content=artifacts.build_zip(project["project_id"]),
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "no-store",
+        },
+    )
