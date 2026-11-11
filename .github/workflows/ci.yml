@@ -23,4 +23,4 @@ jobs:
           pip install fastapi uvicorn pydantic pytest
 
       - name: Test Developer Agent
-        run: python -m pytest tests/smoke_test.py -v
+        run: python tests/smoke_test.py
