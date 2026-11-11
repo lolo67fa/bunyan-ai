@@ -200,6 +200,7 @@ What the mock tests cover:
 - `test_contract_rules.py`: defaults must match the field type and range; stories stay on their own entity; ready documents need list columns and a `suggested_default` on every optional question; rejected documents carry no requirements.
 - `test_status_transitions.py`: the three statuses and the moves between them (clarification → answers → ready, unhelpful answers, rejected → answers with CRUD content), and CRUD ideas with out-of-scope extras are asked about instead of rejected.
 - `test_scenarios.py`: evaluation scenarios A (tasks), B (inventory, Gulf dialect) and C (bookings, Gulf dialect): entities, fields, validation, CRUD coverage and consistency between requirements, stories and criteria.
+- `test_default_fields.py`: the "missing required fields" criterion (AC-2) lists only fields without a default (Task Manager: Title only), defaults stay unchanged, and validation rejects a criterion that expects errors for pre-filled fields (English and Arabic).
 - `test_live_check.py`: the live-test runner with a **fake client**: exactly one request, no retry after an invalid answer, nothing sent when the pre-flight fails or the settings allow more than one request, and the API key never appears in the outputs.
 - `test_crew_wiring.py`: CrewAI Agent / Task / Crew are built offline (no `kickoff`, no network); skipped when CrewAI is not installed.
 
