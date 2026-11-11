@@ -1,5 +1,6 @@
 // Real backend client (FastAPI, owner: Alanoud).
-// Endpoints follow docs/architecture.md §5 — payload shapes are a PROPOSAL until agreed.
+// Matches PR #5: POST /projects takes { "prompt" }, projects are identified by "project_id".
+// Endpoints/fields not in PR #5 yet are marked "proposed" in frontend/README.md.
 const BASE = (import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000').replace(/\/$/, '');
 
 export class ApiError extends Error {
@@ -21,10 +22,13 @@ async function request(path, options = {}) {
   }
   if (!res.ok) {
     let message = `خطأ من الخادم (${res.status})`;
+    if (res.status === 404 && path.endsWith('/answers')) {
+      message = 'إرسال الإجابات غير مدعوم في الباك إند بعد.';
+    }
     try {
       const body = await res.json();
       // FastAPI puts errors in "detail" (string, or a list for validation errors)
-      if (typeof body.detail === 'string') message = body.detail;
+      if (typeof body.detail === 'string' && body.detail !== 'Not Found') message = body.detail;
       else if (Array.isArray(body.detail)) message = body.detail.map((d) => d.msg).join(' · ');
     } catch {
       /* non-JSON error body */
@@ -35,22 +39,60 @@ async function request(path, options = {}) {
   return type.includes('application/json') ? res.json() : res.text();
 }
 
-export const createProject = (idea) =>
-  request('/projects', { method: 'POST', body: JSON.stringify({ idea }) });
+/**
+ * Fills fields the screens rely on but the backend may not send yet,
+ * so a missing field never crashes a screen.
+ */
+function normalize(p) {
+  return {
+    current_agent: null,
+    requirements: null,
+    repair_attempt: 0,
+    artifacts: [],
+    metrics: null,
+    error: null,
+    ...p,
+  };
+}
 
-export const getProject = (id) => request(`/projects/${encodeURIComponent(id)}`);
+// A full project always has "idea" and "status". Some action endpoints (approve in PR #5)
+// return only part of it; in that case read the whole project again.
+const isFullProject = (body) => body && typeof body === 'object' && 'idea' in body && 'status' in body;
 
-export const submitAnswers = (id, answers) =>
-  request(`/projects/${encodeURIComponent(id)}/answers`, {
-    method: 'POST',
-    body: JSON.stringify({ answers }),
-  });
+async function fullProject(id, body) {
+  return isFullProject(body) ? normalize(body) : getProject(id);
+}
 
-export const approveRequirements = (id, { approved, feedback = '' }) =>
-  request(`/projects/${encodeURIComponent(id)}/approve`, {
-    method: 'POST',
-    body: JSON.stringify(approved ? { approved: true } : { approved: false, feedback }),
-  });
+export const createProject = async (idea) =>
+  normalize(await request('/projects', { method: 'POST', body: JSON.stringify({ prompt: idea }) }));
+
+export async function getProject(id) {
+  try {
+    return normalize(await request(`/projects/${encodeURIComponent(id)}`));
+  } catch (e) {
+    // 404 = unknown id, 422 = not a UUID (PR #5 validates the path)
+    if (e.status === 404 || e.status === 422) throw new ApiError(e.status, 'المشروع غير موجود');
+    throw e;
+  }
+}
+
+export const submitAnswers = async (id, answers) =>
+  fullProject(
+    id,
+    await request(`/projects/${encodeURIComponent(id)}/answers`, {
+      method: 'POST',
+      body: JSON.stringify({ answers }),
+    }),
+  );
+
+export const approveRequirements = async (id, { approved, feedback = '' }) =>
+  fullProject(
+    id,
+    await request(`/projects/${encodeURIComponent(id)}/approve`, {
+      method: 'POST',
+      body: JSON.stringify(approved ? { approved: true } : { approved: false, feedback }),
+    }),
+  );
 
 export async function getArtifactText(id, name) {
   const body = await request(

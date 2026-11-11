@@ -18,33 +18,98 @@ export function mockArchitecture(req) {
   };
 }
 
-// The plan fixes "8 core checks" but their exact list is Sara's decision.
+// Same 8 checks, ids, descriptions and categories as Sara's suite
+// (PR #7: tests/e2e/lib/checks.js).
 const CHECKS = [
-  'create_item',
-  'list_items',
-  'edit_item',
-  'delete_item',
-  'persist_after_refresh',
-  'reject_incomplete_input',
-  'empty_state',
-  'error_message_visible',
+  { id: 'create_item', categories: ['create'], description: 'Add a record through the form; it appears in the list and the row count grows by one.' },
+  { id: 'list_items', categories: ['read'], description: 'Three records are listed, each row showing every column from crud.read.list_fields.' },
+  { id: 'edit_item', categories: ['update'], description: 'Edit opens a pre-filled form; after saving, the list shows the new value and not the old one.' },
+  { id: 'delete_item', categories: ['delete'], description: 'Cancelling the delete keeps the record; confirming removes only that record.' },
+  { id: 'persist_after_refresh', categories: ['persistence'], description: 'A saved record is still listed after the page is reloaded (localStorage).' },
+  { id: 'reject_incomplete_input', categories: ['validation'], description: 'Saving with required fields empty does not add a record, before or after reload.' },
+  { id: 'empty_state', categories: ['read'], description: 'With no records the empty-state message is shown; it disappears after the first record.' },
+  { id: 'error_message_visible', categories: ['validation'], description: 'Saving with required fields empty shows a non-empty error next to each of those fields.' },
 ];
 
-export function mockTestReport(req, { failFirstRun = false } = {}) {
-  const checks = CHECKS.map((id) => ({
-    id,
-    passed: !(failFirstRun && id === 'persist_after_refresh'),
-  }));
-  const passed = checks.filter((c) => c.passed).length;
+const FAILING_CHECK = 'persist_after_refresh';
+
+/**
+ * Mock test_report.json in Sara's contract shape (PR #7: tests/e2e/contract/TEST_REPORT.md,
+ * schema 0.1.0-proposal). `attempt` is run.attempt: 0 = first run, 1–2 = re-test after repair.
+ * `fail` makes FAILING_CHECK fail, to show the repair loop.
+ */
+export function mockTestReport(req, { attempt = 0, fail = false } = {}) {
+  const entity = req.entities[0];
+  const criteria = req.acceptance_criteria ?? [];
+  const checks = CHECKS.map((c) => {
+    const failed = fail && c.id === FAILING_CHECK;
+    return {
+      id: c.id,
+      description: c.description,
+      status: failed ? 'failed' : 'passed',
+      duration_ms: 900,
+      related_criteria: criteria.filter((a) => c.categories.includes(a.category)).map((a) => a.id),
+      error: failed ? { message: 'record should survive a reload (MOCK)' } : null,
+      skip_reason: null,
+      evidence: { screenshot: null, trace: null },
+    };
+  });
+  const passed = checks.filter((c) => c.status === 'passed').length;
+  const failed = checks.length - passed;
+  const now = new Date();
+  const durationMs = checks.reduce((s, c) => s + c.duration_ms, 0);
   return {
     _mock: true,
     _note: `${MOCK_NOTE} (owner: Sara)`,
-    app_name: req.app.name,
-    total: checks.length,
-    passed,
-    failed: checks.length - passed,
-    pass_rate: passed / checks.length,
+    schema_version: '0.1.0-proposal',
+    generated_at: now.toISOString(),
+    app: { name: req.app.name, language: req.language },
+    entity: entity?.name ?? null,
+    inputs: {
+      requirements_path: 'requirements.json',
+      requirements_schema_version: req.schema_version,
+      app_dir: 'generated',
+      is_harness_fixture: false,
+    },
+    run: {
+      attempt,
+      max_repair_attempts: 2,
+      started_at: new Date(now.getTime() - durationMs).toISOString(),
+      finished_at: now.toISOString(),
+      duration_ms: durationMs,
+      browser: 'chromium',
+      playwright_version: null,
+      runner_status: failed ? 'failed' : 'passed',
+      blocked_reason: null,
+    },
+    summary: {
+      total: checks.length,
+      passed,
+      failed,
+      skipped: 0,
+      not_run: 0,
+      pass_rate: passed / checks.length,
+      all_passed: failed === 0,
+    },
     checks,
+    defects: checks
+      .filter((c) => c.status === 'failed')
+      .map((c) => ({ check_id: c.id, message: c.error.message, evidence: c.evidence })),
+    warnings: [],
+  };
+}
+
+/**
+ * The summary the backend puts in Project.metrics, built from Sara's report
+ * (mapping from TEST_REPORT.md §4). run_time_seconds is the whole pipeline and
+ * comes from the orchestrator, not from the QA report.
+ */
+export function metricsFromReport(report, runTimeSeconds) {
+  return {
+    pass_rate: report.summary.pass_rate,
+    checks_passed: report.summary.passed,
+    checks_total: report.summary.total,
+    run_time_seconds: runTimeSeconds,
   };
 }
 
