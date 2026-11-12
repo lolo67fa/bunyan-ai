@@ -4,7 +4,7 @@ import ClarificationForm from '../components/ClarificationForm.jsx';
 import OutOfScopeList from '../components/OutOfScopeList.jsx';
 import RequirementsReview from '../components/RequirementsReview.jsx';
 import ResultsPanel from '../components/ResultsPanel.jsx';
-import { STATUS_LABELS } from '../constants/stages.js';
+import { STATUS_LABELS, hasGeneratedApp } from '../constants/stages.js';
 import { useProjectPolling } from '../hooks/useProjectPolling.js';
 import { goHome } from '../hooks/useHashRoute.js';
 
@@ -94,7 +94,9 @@ export default function ProjectPage({ id }) {
         </section>
       )}
 
-      {project.status === 'completed' && <ResultsPanel project={project} />}
+      {(project.status === 'completed' || (project.status === 'failed' && hasGeneratedApp(project))) && (
+        <ResultsPanel project={project} />
+      )}
 
       {anyArtifact && <ArtifactList project={project} />}
     </div>

@@ -1,5 +1,12 @@
 import { useEffect, useState } from 'react';
 import { MODE, downloadUrl, getPreviewHtml, previewUrl } from '../api/client.js';
+import { qaOutcome } from '../constants/stages.js';
+
+const QA_NOTES = {
+  failed: 'الاختبار وجد عيوباً في التطبيق. التفاصيل في test_report.json.',
+  blocked: 'تعذّر اختبار التطبيق، فالجودة غير مؤكدة. التطبيق المولَّد متاح للمعاينة والتحميل.',
+  not_run: 'لم يُشغَّل الاختبار على هذا التطبيق.',
+};
 
 /** Shown when status is completed: QA numbers, live preview, ZIP download. */
 export default function ResultsPanel({ project }) {
@@ -18,7 +25,8 @@ export default function ResultsPanel({ project }) {
 
   const src = previewUrl(project.project_id);
   const zip = downloadUrl(project.project_id);
-  const passed = m && m.checks_passed === m.checks_total;
+  const qa = qaOutcome(project);
+  const passed = qa.ok;
 
   return (
     <section className="card" data-testid="results">
@@ -41,6 +49,18 @@ export default function ResultsPanel({ project }) {
             <span>محاولات إصلاح</span>
           </div>
         </div>
+      )}
+
+      {QA_NOTES[qa.status] && (
+        <p className={`alert ${qa.status === 'not_run' ? '' : 'alert-error'}`} data-testid="qa-note">
+          {QA_NOTES[qa.status]}
+          {qa.failedChecks.length > 0 && <span className="ltr"> ({qa.failedChecks.join(', ')})</span>}
+        </p>
+      )}
+      {qa.ok && qa.skippedChecks.length > 0 && (
+        <p className="muted small" data-testid="qa-skipped">
+          فحوص لم تنطبق على هذا التطبيق: <span className="ltr">{qa.skippedChecks.join(', ')}</span>
+        </p>
       )}
 
       <h3>معاينة التطبيق</h3>

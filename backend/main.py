@@ -1,3 +1,4 @@
+import os
 import threading
 import uuid
 from contextlib import asynccontextmanager
@@ -42,12 +43,21 @@ async def lifespan(app):
 
 
 app = FastAPI(title="Bunyan AI Backend", lifespan=lifespan)
+
+# Which web pages may call this API from the browser. By default only a frontend
+# served from this machine (any port), so another website open in the same
+# browser cannot read or create projects. For a deployed frontend, set
+# BUNYAN_CORS_ORIGINS to a comma-separated list of its origins.
+LOCAL_ORIGIN_REGEX = r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
+CORS_ORIGINS = [o.strip() for o in os.environ.get("BUNYAN_CORS_ORIGINS", "").split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=CORS_ORIGINS,
+    allow_origin_regex=LOCAL_ORIGIN_REGEX,
+    allow_credentials=False,  # the frontend sends no cookies or credentials
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type"],
 )
 
 

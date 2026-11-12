@@ -111,3 +111,43 @@ Errors: FastAPI default `{ "detail": "..." }` (string or validation list). Propo
 | F9 | Bunyan visual identity: colours, fonts, wireframes (current styles are temporary) | Naifah |
 
 The frontend must never contain LLM API keys; all model calls go through the backend.
+
+## Running against the real backend
+
+Verified on 2026-11-12 with the FastAPI backend on this branch (pipeline, QA, artifacts, preview, download).
+
+1. Start the backend from the repository root. `npx` must be on its `PATH` for the QA stage (see `backend/orchestrator/README.md`):
+
+   ```bash
+   python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
+   ```
+
+2. Create `frontend/.env.local` (git-ignored):
+
+   ```
+   VITE_API_MODE=http
+   VITE_API_BASE_URL=http://127.0.0.1:8000
+   ```
+
+3. Start the frontend:
+
+   ```bash
+   npm ci
+   npm run dev
+   ```
+
+The backend accepts browser requests only from a frontend on `localhost` or `127.0.0.1` (any port). For any other origin set `BUNYAN_CORS_ORIGINS` on the backend to a comma-separated list.
+
+What the screens now take from the backend:
+
+- `project.qa.status` decides whether the result is shown as passed. `passed` with skipped checks is still a pass; `failed`, `blocked` and `not_run` each show a note.
+- An agent is shown as done only if it ran. With no Project Manager agent yet, it stays "لم يبدأ" on a completed run.
+- Preview and download are offered whenever the three app files exist, including when QA could not run.
+- Polling stops when a run is over, waits for the user, or the project does not exist. It keeps retrying while the server is unreachable.
+
+## Tests
+
+```bash
+npm test        # logic in src/constants/stages.js, Node's built-in test runner
+npm run build   # production build
+```

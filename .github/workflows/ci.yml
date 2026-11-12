@@ -35,7 +35,7 @@ jobs:
 
       - name: Run artifact, preview and download tests
         run: |
-          python -m pytest tests/test_artifacts_api.py -v
+          python -m pytest tests/test_artifacts_api.py tests/test_cors.py -v
 
       - name: Test Developer Agent
         run: python tests/smoke_test.py
@@ -54,3 +54,10 @@ jobs:
       - name: Run QA agent tests and real QA on generated apps
         run: |
           python -m pytest backend/agents/qa_tester/tests tests/test_qa_pipeline.py -v -rs
+
+      - name: Test and build the React frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm test
+          npm run build

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getProject } from '../api/client.js';
-import { TERMINAL_STATES, WAITING_STATES } from '../constants/stages.js';
+import { shouldStopPolling } from '../constants/stages.js';
 
 const POLL_MS = Number(import.meta.env.VITE_POLL_MS ?? 2000);
 
@@ -18,10 +18,10 @@ export function useProjectPolling(id) {
       const p = await getProject(id);
       setProject(p);
       setError(null);
-      return p;
+      return { project: p, error: null };
     } catch (e) {
       setError(e);
-      return null;
+      return { project: null, error: e };
     }
   }, [id]);
 
@@ -31,10 +31,9 @@ export function useProjectPolling(id) {
     setError(null);
 
     const tick = async () => {
-      const p = await fetchOnce();
+      const result = await fetchOnce();
       if (cancelled) return;
-      const stop = p && (TERMINAL_STATES.includes(p.status) || WAITING_STATES.includes(p.status));
-      if (!stop) timer.current = setTimeout(tick, POLL_MS);
+      if (!shouldStopPolling(result.project, result.error)) timer.current = setTimeout(tick, POLL_MS);
     };
     tick();
 
@@ -50,15 +49,15 @@ export function useProjectPolling(id) {
       clearTimeout(timer.current);
       if (p) setProject(p);
       const tick = async () => {
-        const next = await fetchOnce();
-        const stop =
-          next && (TERMINAL_STATES.includes(next.status) || WAITING_STATES.includes(next.status));
-        if (!stop) timer.current = setTimeout(tick, POLL_MS);
+        const result = await fetchOnce();
+        if (!shouldStopPolling(result.project, result.error)) timer.current = setTimeout(tick, POLL_MS);
       };
       timer.current = setTimeout(tick, POLL_MS);
     },
     [fetchOnce],
   );
 
-  return { project, error, refresh: fetchOnce, resume };
+  const refresh = useCallback(async () => (await fetchOnce()).project, [fetchOnce]);
+
+  return { project, error, refresh, resume };
 }
