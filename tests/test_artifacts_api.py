@@ -19,9 +19,11 @@ from backend import artifacts, main, storage
 TASK_IDEA = "A simple task manager with a title, due date and status"
 ARABIC_IDEA = "أبغى تطبيق لإدارة المهام"
 SAMPLE_INPUTS = Path(__file__).resolve().parents[1] / "backend" / "agents" / "business_analyst" / "samples" / "inputs"
-GENERATED = ["requirements.json", "architecture.json", "index.html", "style.css", "app.js"]
-NOT_GENERATED_YET = ["test_report.json", "project_plan.md", "risks.md"]
-ZIP_CONTENTS = ["app/app.js", "app/index.html", "app/style.css", "architecture.json", "requirements.json"]
+GENERATED = ["requirements.json", "architecture.json", "index.html", "style.css", "app.js", "project_plan.md", "risks.md"]
+NOT_GENERATED_YET = ["test_report.json"]  # QA is switched off in these tests (tests/conftest.py)
+ZIP_CONTENTS = [
+    "app/app.js", "app/index.html", "app/style.css", "architecture.json", "project_plan.md", "requirements.json", "risks.md",
+]
 
 
 @pytest.fixture
@@ -63,6 +65,8 @@ def on_disk(pid, relative):
         ("index.html", "app/index.html", "text/html; charset=utf-8"),
         ("style.css", "app/style.css", "text/css; charset=utf-8"),
         ("app.js", "app/app.js", "text/javascript; charset=utf-8"),
+        ("project_plan.md", "project_plan.md", "text/markdown; charset=utf-8"),
+        ("risks.md", "risks.md", "text/markdown; charset=utf-8"),
     ],
 )
 def test_artifact_is_the_generated_file(client, pid, name, relative, content_type):
@@ -94,7 +98,7 @@ def test_project_artifacts_list_matches_what_can_be_fetched(client, pid):
 
 
 @pytest.mark.parametrize("name", NOT_GENERATED_YET)
-def test_qa_and_pm_artifacts_are_not_advertised_and_give_404(client, pid, name):
+def test_artifacts_that_were_not_produced_are_not_advertised_and_give_404(client, pid, name):
     assert name not in [a["name"] for a in client.get(f"/projects/{pid}").json()["artifacts"]]
     assert client.get(f"/projects/{pid}/artifacts/{name}").status_code == 404
 
@@ -215,10 +219,10 @@ def test_download_contains_nothing_but_known_artifacts(client, pid, isolated_dat
 
 
 def test_download_includes_later_artifacts_when_they_exist(client, pid):
-    (storage.project_dir(pid) / "risks.md").write_text("# Risks\n", encoding="utf-8")
+    (storage.project_dir(pid) / "test_report.json").write_text('{"summary": {}}', encoding="utf-8")
 
     archive = zipfile.ZipFile(io.BytesIO(client.get(f"/projects/{pid}/download").content))
-    assert sorted(archive.namelist()) == sorted(ZIP_CONTENTS + ["risks.md"])
+    assert sorted(archive.namelist()) == sorted(ZIP_CONTENTS + ["test_report.json"])
 
 
 # ---------- missing projects and unfinished work ----------
@@ -347,12 +351,12 @@ def test_preview_serves_app_files_only(client, pid):
 def test_symlink_inside_project_folder_is_not_followed(client, pid, isolated_data_dir):
     secret = isolated_data_dir / "secret.txt"
     secret.write_text("top secret", encoding="utf-8")
-    target = storage.project_dir(pid) / "risks.md"
+    target = storage.project_dir(pid) / "test_report.json"
     os.symlink(secret, target)
 
-    assert client.get(f"/projects/{pid}/artifacts/risks.md").status_code == 404
+    assert client.get(f"/projects/{pid}/artifacts/test_report.json").status_code == 404
     archive = zipfile.ZipFile(io.BytesIO(client.get(f"/projects/{pid}/download").content))
-    assert "risks.md" not in archive.namelist()
+    assert "test_report.json" not in archive.namelist()
 
 
 def test_responses_do_not_reveal_storage_paths(client, pid, isolated_data_dir):

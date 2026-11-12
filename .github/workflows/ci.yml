@@ -33,6 +33,10 @@ jobs:
         run: |
           python -m pytest tests/test_pipeline.py tests/test_storage.py tests/test_api_pipeline.py -v
 
+      - name: Run Project Manager agent and stage tests
+        run: |
+          python -m pytest backend/agents/project_manager/tests tests/test_pm_pipeline.py -v
+
       - name: Run artifact, preview and download tests
         run: |
           python -m pytest tests/test_artifacts_api.py tests/test_cors.py -v

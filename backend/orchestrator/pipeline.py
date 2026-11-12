@@ -1,9 +1,9 @@
-"""MVP pipeline: approved requirements -> Architect -> Developer -> QA Tester -> stored files.
+"""MVP pipeline: approved requirements -> Architect -> Developer -> QA Tester -> Project Manager.
 
 This module does not know about FastAPI or backend storage. The caller passes the
 project dict, the folder to write into, and a callback that persists the project.
 
-Not included yet: the repair loop and the Project Manager agent.
+Not included yet: the repair loop.
 """
 
 from __future__ import annotations
@@ -16,6 +16,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 from backend.agents.architect import ArchitectureError, build_architecture
 from backend.agents.developer import DeveloperError, generate
+from backend.agents.project_manager import PLAN_FILE, RISKS_FILE, write_documents
 from backend.agents.qa_tester.runner import run_qa
 from backend.orchestrator.qa_stage import (
     QA_BLOCKED,
@@ -77,6 +78,8 @@ def run_pipeline(
         app/app.js
         test_report.json        (when QA ran)
         qa_evidence/            (screenshots and traces of failed checks)
+        project_plan.md
+        risks.md
 
     QA runs the existing QA Tester once (attempt 0). ``qa_runner`` replaces it in
     tests; by default it is ``run_qa``, unless the environment has ``BUNYAN_QA=off``,
@@ -90,7 +93,12 @@ def run_pipeline(
       real defects. They are in ``test_report.json`` and in ``metrics``.
     - ``failed`` with ``error.code`` ``qa_blocked`` or ``qa_failed``: QA could not test
       the app. The generated files stay available.
+    - ``failed`` with ``documentation_failed``: the Project Manager could not write its
+      two documents. The generated app, the QA report and the metrics are kept.
     - ``failed`` with another code: Architect, Developer or storage problem.
+
+    The Project Manager runs after QA, whatever QA concluded, and records the real
+    result. It does not run when QA was blocked, because that run has already failed.
 
     The function does not raise for those. It raises ``PipelineNotApproved`` when
     ``requirements_approved`` is not ``True``.
@@ -118,11 +126,15 @@ def run_pipeline(
         _develop(requirements, architecture, app_dir)
         _check_outputs(workdir)
 
+        qa_report = None
         if qa_runner is None:
             project["qa"] = {"status": QA_NOT_RUN, "reason": f"QA is switched off ({QA_ENV_VAR}=off)"}
         else:
             _update(project, on_update, workdir, status="testing", current_agent="qa_tester")
-            _test(project, workdir, app_dir, qa_runner, started)
+            qa_report = _test(project, workdir, app_dir, qa_runner, started)
+
+        _update(project, on_update, workdir, status="documenting", current_agent="project_manager")
+        _document(project, workdir, requirements, architecture, qa_report)
 
         _update(project, on_update, workdir, status="completed", current_agent=None)
     except _StageFailure as failure:
@@ -171,8 +183,8 @@ def _develop(requirements: Dict[str, Any], architecture: Dict[str, Any], app_dir
         raise _StageFailure("generation_failed", f"Developer failed: {_describe(exc)}") from exc
 
 
-def _test(project: dict, workdir: Path, app_dir: Path, qa_runner: QaRunner, started: float) -> None:
-    """Run QA, store its report and put the real numbers on the project."""
+def _test(project: dict, workdir: Path, app_dir: Path, qa_runner: QaRunner, started: float) -> Dict[str, Any]:
+    """Run QA, store its report and put the real numbers on the project. Returns the report."""
     try:
         result = run_qa_stage(workdir, app_dir, workdir / REQUIREMENTS_FILE, qa_runner)
     except QaBlocked as blocked:
@@ -185,6 +197,30 @@ def _test(project: dict, workdir: Path, app_dir: Path, qa_runner: QaRunner, star
     _write_json(workdir / TEST_REPORT_FILE, result.report)
     project["qa"] = result.summary()
     project["metrics"] = metrics_from_report(result.report, time.monotonic() - started)
+    return result.report
+
+
+def _document(
+    project: dict,
+    workdir: Path,
+    requirements: Dict[str, Any],
+    architecture: Dict[str, Any],
+    qa_report: Optional[Dict[str, Any]],
+) -> None:
+    """Project Manager: write project_plan.md and risks.md from this run's real data."""
+    sizes = {}
+    for rel in _expected_files() + [TEST_REPORT_FILE]:
+        if _is_real_file(workdir / rel):
+            sizes[Path(rel).name] = (workdir / rel).stat().st_size
+    try:
+        write_documents(requirements, architecture, workdir, qa_report=qa_report, run=project, files=sizes)
+    except OSError as exc:
+        raise _StageFailure("documentation_failed", f"Could not write the project documents: {_describe(exc)}") from exc
+    except Exception as exc:
+        raise _StageFailure("documentation_failed", f"Project Manager failed: {_describe(exc)}") from exc
+    missing = [name for name in (PLAN_FILE, RISKS_FILE) if not _is_real_file(workdir / name)]
+    if missing:
+        raise _StageFailure("documentation_failed", f"Project documents are missing or empty: {', '.join(missing)}")
 
 
 def _qa_enabled() -> bool:
@@ -221,7 +257,7 @@ def _is_real_file(path: Path) -> bool:
 def _artifacts(workdir: Path) -> List[Dict[str, Any]]:
     """Files that exist right now, in the shape the frontend reads: {"name", "available"}."""
     found = []
-    for rel in _expected_files() + [TEST_REPORT_FILE]:
+    for rel in _expected_files() + [TEST_REPORT_FILE, PLAN_FILE, RISKS_FILE]:
         if _is_real_file(workdir / rel):
             found.append({"name": Path(rel).name, "available": True, "path": rel})
     return found

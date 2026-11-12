@@ -20,7 +20,9 @@ EXPECTED_FILES = [
     "app/index.html",
     "app/style.css",
     "architecture.json",
+    "project_plan.md",
     "requirements.json",
+    "risks.md",
 ]
 
 
@@ -116,6 +118,7 @@ def test_status_and_agent_sequence(tmp_path, recorder):
     assert recorder.steps == [
         ("designing", "software_architect"),
         ("developing", "developer"),
+        ("documenting", "project_manager"),
         ("completed", None),
     ]
 
@@ -126,7 +129,10 @@ def test_artifacts_list_only_files_that_exist(tmp_path, recorder):
     by_status = {p["status"]: [a["name"] for a in p["artifacts"]] for p in recorder.saved}
     assert by_status["designing"] == ["requirements.json"]
     assert by_status["developing"] == ["requirements.json", "architecture.json"]
-    assert by_status["completed"] == ["requirements.json", "architecture.json", "index.html", "style.css", "app.js"]
+    assert by_status["documenting"] == ["requirements.json", "architecture.json", "index.html", "style.css", "app.js"]
+    assert by_status["completed"] == [
+        "requirements.json", "architecture.json", "index.html", "style.css", "app.js", "project_plan.md", "risks.md",
+    ]
 
     for artifact in project["artifacts"]:
         assert artifact["available"] is True

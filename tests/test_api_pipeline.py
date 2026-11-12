@@ -21,7 +21,9 @@ from backend import main, storage
 TASK_IDEA = "A simple task manager with a title, due date and status"
 ARABIC_IDEA = "أبغى تطبيق لإدارة المهام"
 SAMPLE_INPUTS = Path(__file__).resolve().parents[1] / "backend" / "agents" / "business_analyst" / "samples" / "inputs"
-EXPECTED_FILES = ["app/app.js", "app/index.html", "app/style.css", "architecture.json", "requirements.json"]
+EXPECTED_FILES = [
+    "app/app.js", "app/index.html", "app/style.css", "architecture.json", "project_plan.md", "requirements.json", "risks.md",
+]
 
 
 @pytest.fixture
@@ -85,7 +87,7 @@ def test_approval_generates_the_application(client):
     assert final["current_agent"] is None
     assert final["error"] is None
     assert [a["name"] for a in final["artifacts"]] == [
-        "requirements.json", "architecture.json", "index.html", "style.css", "app.js",
+        "requirements.json", "architecture.json", "index.html", "style.css", "app.js", "project_plan.md", "risks.md",
     ]
     assert all(a["available"] for a in final["artifacts"])
     assert final["idea"] == project["idea"]
@@ -127,6 +129,7 @@ def test_state_transitions_are_saved_in_order(client, saved_states):
         ("designing", "software_architect"),  # written by the approve endpoint
         ("designing", "software_architect"),  # pipeline: Architect starts
         ("developing", "developer"),
+        ("documenting", "project_manager"),
         ("completed", None),
     ]
     stamps = [s["updated_at"] for s in saved_states]
@@ -336,5 +339,5 @@ def test_stored_state_is_valid_json_after_every_update(client, isolated_data_dir
     pid = create(client)["project_id"]
     approve(client, pid)
 
-    assert snapshots == ["analyzing", "analyzing", "awaiting_approval", "designing", "designing", "developing", "completed"]
+    assert snapshots == ["analyzing", "analyzing", "awaiting_approval", "designing", "designing", "developing", "documenting", "completed"]
     assert not list(isolated_data_dir.glob("*.tmp")) and not list(isolated_data_dir.glob(".*"))

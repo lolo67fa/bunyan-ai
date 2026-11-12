@@ -35,7 +35,8 @@ CHECK_IDS = [
     "create_item", "list_items", "edit_item", "delete_item",
     "persist_after_refresh", "reject_incomplete_input", "empty_state", "error_message_visible",
 ]
-SIX_FILES = ["app/app.js", "app/index.html", "app/style.css", "architecture.json", "requirements.json", "test_report.json"]
+SIX_FILES = ["app/app.js", "app/index.html", "app/style.css", "architecture.json", "requirements.json", "test_report.json"]  # app + QA report
+ALL_FILES = sorted(SIX_FILES + ["project_plan.md", "risks.md"])  # a completed run: QA report and PM documents
 
 needs_playwright = pytest.mark.skipif(
     shutil.which("npx") is None or not (REPO / "tests" / "e2e" / "node_modules" / "@playwright").is_dir(),
@@ -180,6 +181,7 @@ def test_states_go_through_testing(tmp_path):
         ("designing", "software_architect"),
         ("developing", "developer"),
         ("testing", "qa_tester"),
+        ("documenting", "project_manager"),
         ("completed", None),
     ]
     assert project["status"] == "completed"
@@ -227,12 +229,13 @@ def test_metrics_have_the_fields_the_frontend_reads(tmp_path):
 def test_report_is_stored_in_the_project_folder_and_listed(tmp_path):
     project, recorder = run(tmp_path, StandInRunner())
 
-    assert files_in(tmp_path) == SIX_FILES
+    assert files_in(tmp_path) == ALL_FILES
     report = stored_report(tmp_path)
     QAReport.model_validate(report)
     assert [c["id"] for c in report["checks"]] == CHECK_IDS
     assert [a["name"] for a in project["artifacts"]] == [
         "requirements.json", "architecture.json", "index.html", "style.css", "app.js", "test_report.json",
+        "project_plan.md", "risks.md",
     ]
     # While QA is running the report is not advertised yet.
     testing = next(p for p in recorder.saved if p["status"] == "testing")
@@ -515,7 +518,7 @@ def test_only_one_qa_run_at_a_time(tmp_path):
     assert state["max"] == 1
     assert sorted(state["order"]) == ["p0", "p1", "p2", "p3"]  # each project tested exactly once
     assert all(results[name]["qa"]["status"] == "passed" for name in results)
-    assert all(files_in(tmp_path / name) == SIX_FILES for name in results)
+    assert all(files_in(tmp_path / name) == ALL_FILES for name in results)
 
 
 def test_lock_is_released_after_a_crash(tmp_path):
@@ -556,7 +559,7 @@ def test_api_reports_metrics_and_serves_the_report(client, monkeypatch, qa_on):
     assert served.json()["defects"][0]["check_id"] == "delete_item"
 
     archive = zipfile.ZipFile(io.BytesIO(client.get(f"/projects/{pid}/download").content))
-    assert sorted(archive.namelist()) == SIX_FILES
+    assert sorted(archive.namelist()) == ALL_FILES
     assert json.loads(archive.read("test_report.json")) == served.json()
     assert client.get(f"/projects/{pid}/preview/").status_code == 200  # a defective app can still be inspected
 
@@ -585,10 +588,11 @@ def test_api_saves_the_testing_state(client, monkeypatch, qa_on):
 
     approve_task_project(client)
 
-    assert saved[-4:] == [
+    assert saved[-5:] == [
         ("designing", "software_architect"),
         ("developing", "developer"),
         ("testing", "qa_tester"),
+        ("documenting", "project_manager"),
         ("completed", None),
     ]
 
@@ -646,9 +650,9 @@ def test_real_qa_through_the_api(client, real_qa, isolated_data_dir, idea, entit
     assert str(isolated_data_dir) not in text and str(REPO) not in text and "../" not in text
 
     archive = zipfile.ZipFile(io.BytesIO(client.get(f"/projects/{pid}/download").content))
-    assert sorted(archive.namelist()) == SIX_FILES
+    assert sorted(archive.namelist()) == ALL_FILES
     assert json.loads(archive.read("test_report.json")) == report
-    assert files_in(isolated_data_dir / pid) == SIX_FILES
+    assert files_in(isolated_data_dir / pid) == ALL_FILES
 
 
 @needs_playwright

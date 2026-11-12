@@ -8,15 +8,15 @@ Runs the agents in order for one approved project.
 
 Implemented and tested:
 
-- **Pipeline** — approved requirements → Software Architect → Developer → QA Tester → stored files.
+- **Pipeline** — approved requirements → Software Architect → Developer → QA Tester → Project Manager → stored files.
 - **QA** — Sara's QA Tester (`run_qa`, Playwright, 8 checks) runs once on every generated app. Its real report is stored and its numbers become `project["metrics"]`.
+- **Project Manager** — after QA, a deterministic agent writes `project_plan.md` and `risks.md` from the run's real data (`backend/agents/project_manager`).
 - **API trigger** — `POST /projects/{id}/approve` starts the pipeline as a background task.
 - **Results** — artifact, preview and download endpoints serve the generated files and the QA report.
 
 Not implemented yet:
 
 - QA ↔ Developer repair loop. `backend/agents/developer/repair.py` only coordinates attempts; no repair strategy exists, so QA runs once (`attempt` 0) and `repair_attempt` stays 0.
-- Project Manager agent (`project_plan.md`, `risks.md`).
 - CrewAI. The Architect and Developer are deterministic Python functions, so the pipeline calls them directly.
 
 The Business Analyst runs before this pipeline, in `POST /projects`, and is still fixed to mock mode in `backend/main.py`.
@@ -44,7 +44,8 @@ The module does not import FastAPI or `backend/storage.py`.
 | `designing` | `software_architect` | `build_architecture()` is running |
 | `developing` | `developer` | `generate()` is running |
 | `testing` | `qa_tester` | `run_qa()` is running |
-| `completed` | `null` | the app exists and QA gave a result |
+| `documenting` | `project_manager` | `write_documents()` is running |
+| `completed` | `null` | the app exists, QA gave a result and both PM documents exist |
 | `failed` | the agent that stopped | see `error` |
 
 The Developer's five files are confirmed on disk, and `app.js` checked for an unfilled template placeholder, before QA starts.
@@ -86,6 +87,7 @@ A failed run ends with `status: "failed"` and `error: {"code", "message"}`. The 
 | `storage_failed` | a file could not be written |
 | `qa_blocked` | the QA suite cannot test this app, or some checks never ran |
 | `qa_failed` | QA could not run (Node.js missing, timeout, no report, invalid report) |
+| `documentation_failed` | the Project Manager could not write both documents; the app, the QA report and the metrics are kept |
 | `pipeline_failed` | unexpected error, set by `backend/main.py` |
 | `pipeline_interrupted` | the server restarted during a run, set at startup by `backend/main.py` |
 
@@ -104,7 +106,13 @@ backend/data/{project_id}/app/style.css
 backend/data/{project_id}/app/app.js
 backend/data/{project_id}/test_report.json
 backend/data/{project_id}/qa_evidence/   screenshots and traces of failed checks
+backend/data/{project_id}/project_plan.md
+backend/data/{project_id}/risks.md
 ```
+
+A completed run with QA has eight downloadable files: the five above plus `test_report.json`, `project_plan.md` and `risks.md`.
+
+The Project Manager runs after QA whatever QA concluded, so defects appear in `risks.md`. It does not run when QA was blocked or crashed, because that run has already ended as `failed`.
 
 `project["artifacts"]` lists only files that exist, as `{"name", "available", "path"}`.
 
@@ -137,7 +145,7 @@ npx playwright install chromium
 ## Tests
 
 ```bash
-python -m pytest tests/test_pipeline.py tests/test_storage.py tests/test_api_pipeline.py tests/test_artifacts_api.py tests/test_qa_pipeline.py
+python -m pytest tests/test_pipeline.py tests/test_storage.py tests/test_api_pipeline.py tests/test_artifacts_api.py tests/test_qa_pipeline.py tests/test_pm_pipeline.py
 ```
 
 These run offline (no LLM, no network), with QA switched off by `tests/conftest.py`. The exception is five tests in `tests/test_qa_pipeline.py` that run the real QA suite on generated apps; they are skipped, with the reason shown, when Node.js or `tests/e2e/node_modules` is missing.
