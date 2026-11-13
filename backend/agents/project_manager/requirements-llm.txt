@@ -1,0 +1,4 @@
+# Project Manager Agent: LLM mode (executive summary + up to 3 extra risks).
+# Small: only the Anthropic SDK on top of requirements.txt (no CrewAI).
+-r requirements.txt
+anthropic>=0.40
