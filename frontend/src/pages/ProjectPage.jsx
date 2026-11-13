@@ -1,102 +1,153 @@
-import AgentTimeline from '../components/AgentTimeline.jsx';
-import ArtifactList from '../components/ArtifactList.jsx';
-import ClarificationForm from '../components/ClarificationForm.jsx';
-import OutOfScopeList from '../components/OutOfScopeList.jsx';
-import RequirementsReview from '../components/RequirementsReview.jsx';
-import ResultsPanel from '../components/ResultsPanel.jsx';
-import { STATUS_LABELS } from '../constants/stages.js';
+import { downloadUrl } from '../api/client.js';
+import Icon from '../components/icons.jsx';
+import { Notice, StatusText, Tabs } from '../components/ui.jsx';
+import { goToProject, projectHref } from '../hooks/useHashRoute.js';
 import { useProjectPolling } from '../hooks/useProjectPolling.js';
-import { goHome } from '../hooks/useHashRoute.js';
+import { STAGES, projectStatus, projectSlug } from '../lib/labels.js';
+import { MSG } from '../lib/messages.js';
+import { forgetProject } from '../lib/prefs.js';
+import ClarificationView from '../project/ClarificationView.jsx';
+import DeliveryView from '../project/DeliveryView.jsx';
+import FilesView from '../project/FilesView.jsx';
+import PlanView from '../project/PlanView.jsx';
+import PreviewView from '../project/PreviewView.jsx';
+import ProgressView from '../project/ProgressView.jsx';
+import RequirementsView, { ReviewActions } from '../project/RequirementsView.jsx';
+import StoppedView from '../project/StoppedView.jsx';
+import StructureView from '../project/StructureView.jsx';
+import TestsView from '../project/TestsView.jsx';
 
-export default function ProjectPage({ id }) {
-  const { project, error, refresh, resume } = useProjectPolling(id);
+const RUNNING = ['created', 'analyzing', 'approved', 'designing', 'developing', 'testing', 'repairing', 'documenting'];
+
+const TABS = [
+  { key: 'requirements', label: 'المتطلبات', needs: null },
+  { key: 'structure', label: 'الهيكل', needs: 'architecture.json' },
+  { key: 'files', label: 'الملفات', needs: 'index.html' },
+  { key: 'tests', label: 'الاختبار', needs: 'test_report.json' },
+  { key: 'plan', label: 'الخطة', needs: 'project_plan.md' },
+  { key: 'preview', label: 'المعاينة', needs: 'index.html' },
+];
+
+const VIEWS = {
+  requirements: RequirementsView,
+  structure: StructureView,
+  files: FilesView,
+  tests: TestsView,
+  plan: PlanView,
+  preview: PreviewView,
+};
+
+function available(project, key) {
+  const t = TABS.find((x) => x.key === key);
+  if (!t) return false;
+  if (key === 'requirements') return Boolean(project.requirements) && project.status !== 'awaiting_clarification';
+  return project.artifacts?.some((a) => a.name === t.needs && a.available);
+}
+
+function subtitle(project) {
+  const s = project.status;
+  if (s === 'analyzing' || s === 'created') return <span className="muted small">يقرأ محلّل الأعمال فكرتك ويكتب المتطلبات.</span>;
+  if (s === 'awaiting_approval') return <StatusText tone="waiting">المتطلبات بانتظار موافقتك</StatusText>;
+  if (s === 'completed') {
+    return (
+      <div className="stage-links">
+        {STAGES.map((st, i) => (
+          <a key={st.key} href={projectHref(project.project_id, ['requirements', 'structure', 'files', 'tests', 'plan'][i])}>
+            ✓ {st.label}
+          </a>
+        ))}
+        <span className="muted">· اكتملت كل المراحل</span>
+      </div>
+    );
+  }
+  return <span className="muted small">وافقت على المتطلبات · البناء جارٍ</span>;
+}
+
+export default function ProjectPage({ id, tab }) {
+  const { project, error, stalled, resume, retry } = useProjectPolling(id);
 
   if (error && !project) {
+    const notFound = error.status === 404;
     return (
-      <div className="page">
-        <div className="card">
-          <p className="alert alert-error">{error.message}</p>
+      <div className="page page-narrow">
+        <div style={{ display: 'grid', gap: 'var(--bn-s3)', justifyItems: 'start' }} data-testid="project-error">
+          <span className="result-mark fail"><Icon name="alert" size={20} /></span>
+          <h1 className="title">{notFound ? 'المشروع غير موجود' : 'تعذّر تحميل المشروع'}</h1>
+          <p className="lead">{error.message}</p>
           <div className="actions">
-            <button className="btn" onClick={refresh}>
-              إعادة المحاولة
-            </button>
-            <button className="btn" onClick={goHome}>
-              فكرة جديدة
-            </button>
+            {notFound ? (
+              <a className="btn btn-primary" href="#/projects" onClick={() => forgetProject(id)}>العودة للمشاريع</a>
+            ) : (
+              <button type="button" className="btn btn-primary" onClick={retry}>إعادة المحاولة</button>
+            )}
+            <a className="btn" href="#/new">مشروع جديد</a>
           </div>
         </div>
       </div>
     );
   }
-
   if (!project) {
     return (
-      <div className="page">
-        <div className="card loading" data-testid="loading">
-          جاري التحميل…
-        </div>
+      <div className="page page-narrow" aria-busy="true">
+        <p className="muted" data-testid="loading">جاري التحميل…</p>
       </div>
     );
   }
 
-  const req = project.requirements;
-  const outOfScope = project.status === 'rejected' || req?.status === 'rejected_out_of_scope';
-  const stopped = project.status === 'failed' || project.status === 'rejected';
-  const working = !['awaiting_clarification', 'awaiting_approval', 'approved', 'completed', 'failed', 'rejected'].includes(
-    project.status,
+  const s = project.status;
+  const running = RUNNING.includes(s);
+  const errorBar = stalled && (
+    <Notice tone="error" testId="stalled" action={{ label: 'إعادة المحاولة', onClick: retry }}>
+      {error?.message ?? MSG.serverDown}
+    </Notice>
   );
-  const anyArtifact = project.artifacts?.some((a) => a.available);
+
+  // Full-page states without tabs
+  if (s === 'awaiting_clarification' && project.requirements && !tab) {
+    return <>{errorBar}<ClarificationView project={project} onDone={resume} /></>;
+  }
+  if (s === 'rejected' || s === 'failed') return <StoppedView project={project} />;
+  if (s === 'completed' && !tab) return <DeliveryView project={project} />;
+
+  const req = project.requirements;
+  const appName = req?.status === 'ready_for_review' ? req.app?.name : null;
+  const tabs = TABS.map((t) => ({ ...t, disabled: !available(project, t.key), hint: 'يتوفر عند انتهاء المرحلة' }));
+  const activeTab = tab && available(project, tab) ? tab : s === 'awaiting_approval' ? 'requirements' : null;
+  const View = activeTab ? VIEWS[activeTab] : null;
+  const zip = downloadUrl(project.project_id);
 
   return (
     <div className="page">
-      <section className="card idea-echo">
-        <span className="muted small">فكرتك</span>
-        <p dir="auto">{project.idea}</p>
-      </section>
+      {errorBar}
+      <nav className="crumbs" aria-label="المسار">
+        <a href="#/projects">المشاريع</a> / <span>{appName ?? 'فكرة جديدة'}</span>
+      </nav>
 
-      {error && <p className="alert alert-error">انقطع التحديث: {error.message}</p>}
-
-      <AgentTimeline project={project} />
-
-      {working && (
-        <p className="working" aria-live="polite" data-testid="working">
-          <span className="spinner" aria-hidden="true" /> {STATUS_LABELS[project.status]}…
-        </p>
-      )}
-
-      {project.status === 'awaiting_clarification' && req && (
-        <ClarificationForm project={project} onSubmitted={resume} />
-      )}
-
-      {project.status === 'awaiting_approval' && req && <RequirementsReview project={project} onDone={resume} />}
-
-      {project.status === 'approved' && (
-        <p className="working" aria-live="polite" data-testid="approved">
-          <span className="spinner" aria-hidden="true" /> تمت الموافقة على المتطلبات، بانتظار بدء التصميم…
-        </p>
-      )}
-
-      {stopped && (
-        <section className="card" data-testid="failed">
-          <h2>{outOfScope ? 'الفكرة خارج نطاق النسخة الأولى' : 'توقف التشغيل'}</h2>
-          {!outOfScope && project.error?.message && <p className="alert alert-error">{project.error.message}</p>}
-          {outOfScope && req && (
-            <>
-              <p className="muted">بنيان يبني حالياً تطبيقات ويب للإضافة والعرض والتعديل والحذف فقط.</p>
-              <OutOfScopeList items={req.out_of_scope} dir={req.language === 'ar' ? 'rtl' : 'ltr'} />
-            </>
-          )}
+      <div className="page-head">
+        <div>
+          <h1 className="title" data-testid="project-title">{appName ?? 'فكرة جديدة'}</h1>
+          {subtitle(project)}
+          <span className="sr-only" data-testid="project-status">{projectStatus(project).text}</span>
+        </div>
+        {s === 'awaiting_approval' && <ReviewActions project={project} onDone={resume} />}
+        {s === 'completed' && (
           <div className="actions">
-            <button className="btn btn-primary" onClick={goHome}>
-              جرّب فكرة ثانية
-            </button>
+            <a className="btn" href={projectHref(project.project_id, 'preview')}>معاينة</a>
+            {zip ? (
+              <a className="btn btn-primary" href={zip} download={`${projectSlug(project)}.zip`}>تحميل ZIP</a>
+            ) : (
+              <button type="button" className="btn btn-primary" disabled title={MSG.downloadNotReady}>تحميل ZIP</button>
+            )}
           </div>
-        </section>
+        )}
+      </div>
+
+      <Tabs items={tabs} active={activeTab} onSelect={(k) => goToProject(project.project_id, k)} />
+
+      {running && activeTab && (
+        <a className="small" href={projectHref(project.project_id)}>← مراحل البناء</a>
       )}
-
-      {project.status === 'completed' && <ResultsPanel project={project} />}
-
-      {anyArtifact && <ArtifactList project={project} />}
+      {View ? <View project={project} onDone={resume} /> : running && <ProgressView project={project} onRetry={retry} />}
     </div>
   );
 }

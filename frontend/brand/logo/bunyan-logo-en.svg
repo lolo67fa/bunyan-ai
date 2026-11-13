@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 252 56" width="252" height="56" role="img" aria-label="Bunyan AI">
+  <title>Bunyan AI</title>
+  <rect x="18" y="6" width="20" height="20" rx="3.2" fill="#14403A"/>
+  <rect x="6" y="30" width="20" height="20" rx="3.2" fill="#14403A"/>
+  <rect x="30" y="30" width="20" height="20" rx="3.2" fill="#168477"/>
+  <text x="64" y="39" font-family="'IBM Plex Sans Arabic', 'IBM Plex Sans', 'Segoe UI', Tahoma, sans-serif" font-weight="600" font-size="30" fill="#1C1F1E">Bunyan AI</text>
+</svg>

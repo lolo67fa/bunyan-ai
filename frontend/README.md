@@ -17,18 +17,31 @@ npm run dev                  # http://localhost:5173
 
 ## Screens
 
-| Screen | Shown when `status` is | Component |
-|---|---|---|
-| Idea input | — (home, `#/`) | `pages/IdeaPage.jsx` |
-| Agent progress dashboard | always on `#/projects/{id}` | `components/AgentTimeline.jsx` |
-| Clarification questions | `awaiting_clarification` | `components/ClarificationForm.jsx` |
-| Requirements review & approval | `awaiting_approval` | `components/RequirementsReview.jsx` |
-| Approved, waiting for the Architect | `approved` | `pages/ProjectPage.jsx` |
-| Out-of-scope / failure | `rejected` / `failed` | `pages/ProjectPage.jsx` + `components/OutOfScopeList.jsx` |
-| Results: metrics, preview, ZIP | `completed` | `components/ResultsPanel.jsx` |
-| Artifact view / download | any artifact available | `components/ArtifactList.jsx` |
+Built to the approved design (direction C, calm green). Tokens: `src/styles/tokens.css`; brand files: `brand/`.
 
-The page polls `GET /projects/{id}` every `VITE_POLL_MS` ms and stops while the run waits for the user or has finished.
+| Route | Screen | File |
+|---|---|---|
+| `#/` | Landing page | `pages/LandingPage.jsx` |
+| `#/new` | New project (idea, examples, what Bunyan can build) | `pages/NewProjectPage.jsx` |
+| `#/projects` | Projects: filters, search, "waiting for you" notice | `pages/ProjectsPage.jsx` |
+| `#/projects/<id>` | Changes with the run status (below) | `pages/ProjectPage.jsx` |
+| `#/projects/<id>/<tab>` | `requirements`, `structure`, `files`, `tests`, `plan`, `preview` | `project/*View.jsx` |
+| `#/settings`, `#/help` | Appearance, reduced motion, FAQ | `pages/SettingsPage.jsx` |
+
+Project page by status:
+
+| Status | What the user sees |
+|---|---|
+| `analyzing` | Agent steps, analyst working |
+| `awaiting_clarification` | Clarification questions (`ClarificationView`) |
+| `awaiting_approval` | Requirements review with approve and request-changes dialog |
+| `approved` … `documenting` | Build progress (`ProgressView`); finished stages open as tabs |
+| `completed` | Delivery page (`DeliveryView`), all tabs available |
+| `rejected`, `failed` | What happened and what to do next (`StoppedView`) |
+
+Waiting and errors follow the approved table: polling every 3 s, stopped after 3 failed requests in a row with a retry button; requests time out after 15 s; a long-running agent shows a note after 30 s and options after 5 minutes. Messages live in `src/lib/messages.js`.
+
+The projects list is kept in this browser (`localStorage`), because the API has no list endpoint yet (proposed: `GET /projects`).
 
 ## Mock mode
 
@@ -39,7 +52,7 @@ The page polls `GET /projects/{id}` every `VITE_POLL_MS` ms and stops while the 
   - vague idea → clarification questions → answers → task-manager requirements (same as `samples/answers/vague_idea_answers.json`)
   - payments / mobile app / chat → rejected as out of scope
   - Gulf-dialect inventory → shows one QA failure and one repair attempt
-- `test_report.json` follows Sara's contract from PR #7. `architecture.json`, the generated app, `project_plan.md` and `risks.md` are **placeholders** (`src/mocks/placeholders.js`, marked `_mock`) until their owners share real samples.
+- `test_report.json` follows Sara's contract from PR #7, and `architecture.json` uses Naifah's real samples from PR #4 where one exists. The generated app, `project_plan.md` and `risks.md` are **placeholders** (`src/mocks/placeholders.js`, marked `_mock`) until their owners share real samples.
 - Mock runs are stored in `localStorage` (`bunyan.mock.projects.v2`), so a refresh keeps them.
 
 ## API contract
