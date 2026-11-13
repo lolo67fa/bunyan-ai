@@ -5,6 +5,15 @@
 **Consumers:** Yara (Developer / CRUD template), Sara (fixed QA suite), Jood (frontend + PM agent), Alanoud (orchestrator)
 **Source of truth:** [`../schema.py`](../schema.py) (Pydantic). [`architecture.schema.proposal.json`](architecture.schema.proposal.json) is generated from it; do not edit by hand.
 
+### Fix in v0.3.1 (integration review before merge)
+
+| Problem | Fix |
+|---|---|
+| When two acceptance criteria quoted **different** texts for the same message or button (e.g. a confirmed and a cancelled delete, or two validation criteria on one field), the document kept the last text but `verbatim_messages` kept the first, so `build_architecture` raised a pydantic `ValidationError` on BA-valid input. | Each target is set once: the **first** criterion wins in both places, and a later different quote only adds a warning naming both criteria. |
+| A cancelled-delete criterion (`clicks "Delete" … clicks "Cancel"`) could set `confirm_button` to "Cancel". | A second button that cancels (Cancel / Keep / No / إلغاء / تراجع) sets `cancel_delete_button` instead. |
+
+Verified: 1,891 BA-valid variants of the 6 ready samples (quoted messages, extra field types, read options, delete wording) all produce a valid architecture and a generated app with the Developer Agent (PR #10); 0 crashes (was 1,588). Fixtures synced with PR #8; 50 tests.
+
 ### Changes in v0.3.0 (review of PR #4 by Ghala)
 
 | Review point | Change |

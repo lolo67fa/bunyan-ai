@@ -87,6 +87,8 @@ _EMPTY_WORDS = re.compile(r"\b(empty|leaves?|clears?|blank|without)\b|فارغ|�
 _NO_RECORDS = re.compile(r"no (records|items|\w+ yet)|empty[- ]state|لا توجد|عدم وجود|فارغة", re.IGNORECASE)
 _SEARCH = re.compile(r"search|filter|بحث|تصفية|فلتر", re.IGNORECASE)
 _CONFIRM = re.compile(r"confirm|تأكيد|يؤكد", re.IGNORECASE)
+# a button label that cancels instead of confirming (cancelled-delete criteria)
+_CANCEL = re.compile(r"^\s*(cancel|keep|no|back|إلغاء|الغاء|تراجع|لا|رجوع)\b", re.IGNORECASE)
 
 
 class ArchitectureError(ValueError):
@@ -215,29 +217,54 @@ def _validation_rule(when: str, field: Dict[str, Any]) -> Optional[str]:
 
 
 def _apply_acceptance_criteria(req: Dict[str, Any], doc: Dict[str, Any], warnings: List[str]) -> List[Dict[str, str]]:
-    """Copy texts the acceptance criteria quote literally (rule M1). Returns verbatim_messages."""
+    """Copy texts the acceptance criteria quote literally (rule M1). Returns verbatim_messages.
+
+    Each target (a message or a button label) is set at most once: the first criterion that
+    quotes it wins, and a later criterion quoting a *different* text only adds a warning.
+    The value written into the document and the entry in ``verbatim_messages`` therefore
+    always agree, which the contract checks.
+    """
     fields = doc["entity"]["fields"]
     by_name = {f["name"]: f for f in fields}
-    form_screen = doc["screens"][1]["components"]
+    save_button = next(c for c in doc["screens"][1]["components"] if c["type"] == "save_button")
     verbatim: List[Dict[str, str]] = []
+    taken: Dict[str, Dict[str, str]] = {}
 
-    def take(path: str, text: str, source: str) -> None:
-        if any(vm["path"] == path for vm in verbatim):
-            return  # first criterion wins
-        verbatim.append({"path": path, "text": text, "source": source})
+    def put(path: str, text: str, source: str) -> None:
+        if path in taken:
+            first = taken[path]
+            if first["text"] != text:
+                warnings.append(
+                    f"{source} quotes “{text}” for {path}, but {first['source']} already set “{first['text']}”; "
+                    f"{first['source']} is used"
+                )
+            return
+        parts = path.split(".")
+        if parts[0] == "messages":
+            doc["messages"][parts[1]] = text
+        elif parts[0] == "entity":
+            by_name[parts[2]]["messages"][parts[4]] = text
+        elif path == "screens.form.save_button":
+            save_button["label"] = text
+        entry = {"path": path, "text": text, "source": source}
+        taken[path] = entry
+        verbatim.append(entry)
 
     save_clicks: Counter = Counter()
+    first_click_source: Dict[str, str] = {}
     for ac in req.get("acceptance_criteria", []):
         cat, when, then, ac_id = ac["category"], ac["when"], ac["then"], ac["id"]
         clicks = _CLICK_RE.findall(when)
         if cat in ("create", "update", "validation") and clicks:
             save_clicks.update([clicks[-1]])
+            first_click_source.setdefault(clicks[-1], ac_id)
         if cat == "delete" and clicks:
-            take("messages.delete_button", clicks[0], ac_id)
-            doc["messages"]["delete_button"] = clicks[0]
-            if len(clicks) > 1 and _CONFIRM.search(when):
-                take("messages.confirm_button", clicks[1], ac_id)
-                doc["messages"]["confirm_button"] = clicks[1]
+            put("messages.delete_button", clicks[0], ac_id)
+            if len(clicks) > 1:
+                if _CANCEL.search(clicks[1]):
+                    put("messages.cancel_delete_button", clicks[1], ac_id)
+                elif _CONFIRM.search(when):
+                    put("messages.confirm_button", clicks[1], ac_id)
 
         quoted = _MESSAGE_RE.findall(then)
         if not quoted:
@@ -246,18 +273,15 @@ def _apply_acceptance_criteria(req: Dict[str, Any], doc: Dict[str, Any], warning
         if cat == "read":
             key = "no_results" if _SEARCH.search(when) else "empty" if _NO_RECORDS.search(then + " " + text) else None
             if key:
-                doc["messages"][key] = text
-                take(f"messages.{key}", text, ac_id)
+                put(f"messages.{key}", text, ac_id)
         elif cat == "delete" and _CONFIRM.search(then + " " + when):
-            doc["messages"]["confirm_delete"] = text
-            take("messages.confirm_delete", text, ac_id)
+            put("messages.confirm_delete", text, ac_id)
         elif cat == "validation":
             rest = re.sub(r"[\"“«]" + re.escape(text) + r"[\"”»]", " ", then)
             field = _label_in(rest, fields) or _label_in(when, fields)
             rule = _validation_rule(when, field) if field else None
             if field and rule:
-                by_name[field["name"]]["messages"][rule] = text
-                take(f"entity.fields.{field['name']}.messages.{rule}", text, ac_id)
+                put(f"entity.fields.{field['name']}.messages.{rule}", text, ac_id)
             else:
                 warnings.append(
                     f"{ac_id} quotes the message “{text}” but it is not tied to one field rule (likely a business "
@@ -266,10 +290,7 @@ def _apply_acceptance_criteria(req: Dict[str, Any], doc: Dict[str, Any], warning
 
     if save_clicks:
         label, _ = save_clicks.most_common(1)[0]
-        button = next(c for c in form_screen if c["type"] == "save_button")
-        button["label"] = label
-        take("screens.form.save_button", label, next(
-            ac["id"] for ac in req.get("acceptance_criteria", []) if label in _CLICK_RE.findall(ac["when"])))
+        put("screens.form.save_button", label, first_click_source[label])
     return verbatim
 
 

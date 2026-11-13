@@ -258,3 +258,40 @@ def test_contract_requires_decimals_for_numbers(requirements):
     next(f for f in arch["entity"]["fields"] if f["name"] == "price").pop("display_format")
     with pytest.raises(ValidationError, match="display_format.decimals"):
         ArchitectureDocument.model_validate(arch)
+
+
+# --- regression: several criteria quoting the same target (real LLM output) ------------------
+# Before v0.3.1 the document took the LAST quoted text but verbatim_messages kept the FIRST,
+# so build_architecture raised a pydantic ValidationError on BA-valid input.
+
+def test_two_criteria_quoting_one_field_rule_do_not_crash(requirements):
+    req = requirements("task_manager_en")
+    _ac(req, "AC-3")["then"] = 'the message "Title is too short" is shown next to "Title"'
+    _ac(req, "AC-4")["when"] = 'the user types 2 characters in "Title" and clicks "Save"'
+    _ac(req, "AC-4")["then"] = 'the message "Title needs at least 3 letters" is shown next to "Title"'
+    arch = build_architecture(req)  # must not raise
+    assert _field(arch, "title")["messages"]["min_length"] == "Title is too short"
+    assert any("AC-4" in w and "AC-3" in w and "is used" in w for w in arch["warnings"])
+
+
+def test_quoted_screen_messages_first_criterion_wins(requirements):
+    req = requirements("task_manager_en")
+    reads = [a for a in req["acceptance_criteria"] if a["category"] == "read"]
+    for i, a in enumerate(reads):
+        a["when"] = "the user types xyz in the search box"
+        a["then"] = f'the message "Nothing found {i}" is shown'
+    arch = build_architecture(req)
+    assert arch["messages"]["no_results"] == "Nothing found 0"
+    assert {v["path"]: v["text"] for v in arch["verbatim_messages"]}["messages.no_results"] == "Nothing found 0"
+
+
+def test_cancelled_delete_sets_cancel_button_not_confirm(requirements):
+    req = requirements("task_manager_en")
+    dels = [a for a in req["acceptance_criteria"] if a["category"] == "delete"]
+    dels[0]["when"] = 'the user clicks "Delete" and then clicks "Cancel" in the confirmation'
+    dels[0]["then"] = 'the confirmation message "Delete this task?" closes and the Task is still listed'
+    dels[1]["when"] = 'the user clicks "Delete" and confirms by clicking "Yes, delete"'
+    arch = build_architecture(req)
+    assert arch["messages"]["cancel_delete_button"] == "Cancel"
+    assert arch["messages"]["confirm_button"] == "Yes, delete"
+    assert arch["messages"]["confirm_delete"] == "Delete this task?"
