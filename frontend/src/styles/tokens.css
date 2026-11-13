@@ -1,0 +1,135 @@
+/* Bunyan design tokens — the single source for colour, type, spacing and shape.
+   Values come from the approved identity ("الهوية والتوكنز", direction C · calm green).
+   Mirror of brand/tokens.json; change both together. Contrast ratios are on white. */
+
+:root {
+  /* Neutrals */
+  --bn-bg: #ffffff;           /* page background */
+  --bn-bg-subtle: #fafaf8;    /* side bar, quiet panels */
+  --bn-selected: #eceae5;     /* selected item */
+  --bn-border: #eae8e3;       /* borders and dividers */
+  --bn-text: #1c1f1e;         /* primary text · 16.6:1 */
+  --bn-text-2: #3f4441;       /* body text · 9.9:1 */
+  --bn-text-muted: #6b6f6c;   /* secondary and helper text · 5.1:1 */
+
+  /* Brand */
+  --bn-accent: #0f6e62;       /* primary action and links · 6.1:1 */
+  --bn-accent-hover: #0c5c52;
+  --bn-accent-soft: #e8f3f1;  /* focus ring fill, selected tab tint */
+  --bn-brand: #168477;        /* logo only */
+  --bn-brand-ink: #14403a;    /* logo's dark blocks only */
+  --bn-on-accent: #ffffff;
+
+  /* Status */
+  --bn-success: #1e7a43;      /* done, passed · 5.4:1 */
+  --bn-warning: #9a5b00;      /* waiting for you · 5.4:1 */
+  --bn-danger: #b42318;       /* error, failed · 6.6:1 */
+  --bn-success-soft: #edf6f0;
+  --bn-warning-soft: #fdf7ea;
+  --bn-warning-line: #f0dcae;
+  --bn-danger-soft: #fdf0ee;
+  --bn-danger-line: #f3c9c3;
+
+  /* Overlays */
+  --bn-scrim: rgb(18 21 20 / 0.42);
+  --bn-shadow-float: 0 12px 32px rgb(18 21 20 / 0.14), 0 2px 6px rgb(18 21 20 / 0.06);
+  --bn-toast-bg: #1c1f1e;
+  --bn-toast-fg: #ffffff;
+  --bn-code-bg: #fafaf8;
+
+  /* Type */
+  --bn-font: 'IBM Plex Sans Arabic', 'IBM Plex Sans', 'Segoe UI', Tahoma, sans-serif;
+  --bn-font-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  --bn-fs-display: 28px;      /* marketing page title · 600 */
+  --bn-fs-title: 22px;        /* screen title · 600 */
+  --bn-fs-section: 15px;      /* section heading · 600 */
+  --bn-fs-body: 14px;         /* body · 400 · line 1.7 */
+  --bn-fs-small: 13px;        /* secondary text · 400 */
+  --bn-fs-mono: 13px;         /* code and file names */
+  --bn-lh-body: 1.7;
+
+  /* Spacing: 4px grid */
+  --bn-s1: 4px;
+  --bn-s2: 8px;
+  --bn-s3: 12px;
+  --bn-s4: 16px;
+  --bn-s5: 24px;
+  --bn-s6: 32px;
+  --bn-s7: 48px;
+
+  /* Shape */
+  --bn-r-control: 6px;        /* buttons and fields */
+  --bn-r-badge: 8px;
+  --bn-r-window: 10px;        /* floating windows only */
+  --bn-h-control: 40px;       /* buttons and fields */
+  --bn-h-control-lg: 44px;    /* primary action on empty pages */
+
+  /* Layout */
+  --bn-sidebar: 240px;
+  --bn-content: 760px;
+  --bn-content-wide: 960px;
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bn-bg: #121514;
+    --bn-bg-subtle: #171b19;
+    --bn-selected: #242a27;
+    --bn-border: #2b302e;
+    --bn-text: #eceeec;
+    --bn-text-2: #c7ccc9;
+    --bn-text-muted: #a4aaa7;
+    --bn-accent: #4cc2b0;
+    --bn-accent-hover: #6fd1c2;
+    --bn-accent-soft: #15302b;
+    --bn-brand: #4cc2b0;
+    --bn-brand-ink: #eceeec;
+    --bn-on-accent: #0b1f1c;
+    --bn-success: #6bcb8e;
+    --bn-warning: #e8b25a;
+    --bn-danger: #ff8a7d;
+    --bn-success-soft: #14241a;
+    --bn-warning-soft: #2a2213;
+    --bn-warning-line: #4a3a1c;
+    --bn-danger-soft: #2c1714;
+    --bn-danger-line: #55261f;
+    --bn-scrim: rgb(0 0 0 / 0.6);
+    --bn-shadow-float: 0 12px 32px rgb(0 0 0 / 0.5), 0 0 0 1px #2b302e;
+    --bn-toast-bg: #eceeec;
+    --bn-toast-fg: #121514;
+    --bn-code-bg: #171b19;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme='dark'] {
+  --bn-bg: #121514;
+  --bn-bg-subtle: #171b19;
+  --bn-selected: #242a27;
+  --bn-border: #2b302e;
+  --bn-text: #eceeec;
+  --bn-text-2: #c7ccc9;
+  --bn-text-muted: #a4aaa7;
+  --bn-accent: #4cc2b0;
+  --bn-accent-hover: #6fd1c2;
+  --bn-accent-soft: #15302b;
+  --bn-brand: #4cc2b0;
+  --bn-brand-ink: #eceeec;
+  --bn-on-accent: #0b1f1c;
+  --bn-success: #6bcb8e;
+  --bn-warning: #e8b25a;
+  --bn-danger: #ff8a7d;
+  --bn-success-soft: #14241a;
+  --bn-warning-soft: #2a2213;
+  --bn-warning-line: #4a3a1c;
+  --bn-danger-soft: #2c1714;
+  --bn-danger-line: #55261f;
+  --bn-scrim: rgb(0 0 0 / 0.6);
+  --bn-shadow-float: 0 12px 32px rgb(0 0 0 / 0.5), 0 0 0 1px #2b302e;
+  --bn-toast-bg: #eceeec;
+  --bn-toast-fg: #121514;
+  --bn-code-bg: #171b19;
+  color-scheme: dark;
+}

@@ -1,64 +1,79 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getProject } from '../api/client.js';
 import { TERMINAL_STATES, WAITING_STATES } from '../constants/stages.js';
+import { MAX_POLL_ERRORS, POLL_MS } from '../lib/messages.js';
+import { rememberProject } from '../lib/prefs.js';
 
-const POLL_MS = Number(import.meta.env.VITE_POLL_MS ?? 2000);
+const ENV_POLL = Number(import.meta.env.VITE_POLL_MS);
+const INTERVAL = Number.isFinite(ENV_POLL) && ENV_POLL > 0 ? ENV_POLL : POLL_MS;
+
+const shouldStop = (p) => p && (TERMINAL_STATES.includes(p.status) || WAITING_STATES.includes(p.status));
 
 /**
- * Polls GET /projects/{id} while the run is working.
- * Stops while the run waits for the user, or once it is completed/failed.
+ * Polls GET /projects/{id} every 3 s while the run is working.
+ * Stops while the run waits for the user, once it has finished, or after
+ * 3 failed requests in a row (`stalled`); `retry()` starts it again.
  */
 export function useProjectPolling(id) {
   const [project, setProject] = useState(null);
   const [error, setError] = useState(null);
+  const [stalled, setStalled] = useState(false);
   const timer = useRef(null);
+  const errors = useRef(0);
+  const alive = useRef(true);
 
-  const fetchOnce = useCallback(async () => {
+  const tick = useCallback(async () => {
+    clearTimeout(timer.current);
     try {
       const p = await getProject(id);
+      if (!alive.current) return;
+      errors.current = 0;
       setProject(p);
       setError(null);
-      return p;
+      setStalled(false);
+      rememberProject(p);
+      if (!shouldStop(p)) timer.current = setTimeout(tick, INTERVAL);
     } catch (e) {
+      if (!alive.current) return;
       setError(e);
-      return null;
+      errors.current += 1;
+      if (e.status === 404) return; // unknown project: nothing to poll
+      if (errors.current >= MAX_POLL_ERRORS) setStalled(true);
+      else timer.current = setTimeout(tick, INTERVAL);
     }
   }, [id]);
 
   useEffect(() => {
-    let cancelled = false;
+    alive.current = true;
+    errors.current = 0;
     setProject(null);
     setError(null);
-
-    const tick = async () => {
-      const p = await fetchOnce();
-      if (cancelled) return;
-      const stop = p && (TERMINAL_STATES.includes(p.status) || WAITING_STATES.includes(p.status));
-      if (!stop) timer.current = setTimeout(tick, POLL_MS);
-    };
+    setStalled(false);
     tick();
-
     return () => {
-      cancelled = true;
+      alive.current = false;
       clearTimeout(timer.current);
     };
-  }, [fetchOnce]);
+  }, [tick]);
 
-  // After the user answers/approves, the screen sets the returned project and polling resumes.
+  /** After an action (answers, approve) use the returned project and keep polling. */
   const resume = useCallback(
     (p) => {
+      if (p) {
+        setProject(p);
+        rememberProject(p);
+      }
       clearTimeout(timer.current);
-      if (p) setProject(p);
-      const tick = async () => {
-        const next = await fetchOnce();
-        const stop =
-          next && (TERMINAL_STATES.includes(next.status) || WAITING_STATES.includes(next.status));
-        if (!stop) timer.current = setTimeout(tick, POLL_MS);
-      };
-      timer.current = setTimeout(tick, POLL_MS);
+      timer.current = setTimeout(tick, INTERVAL);
     },
-    [fetchOnce],
+    [tick],
   );
 
-  return { project, error, refresh: fetchOnce, resume };
+  const retry = useCallback(() => {
+    errors.current = 0;
+    setStalled(false);
+    tick();
+  }, [tick]);
+
+  return { project, error, stalled, resume, retry, refresh: tick };
 }

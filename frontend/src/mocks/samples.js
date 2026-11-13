@@ -6,6 +6,16 @@ import inventoryManagerAr from './requirements/inventory_manager_ar.requirements
 import appointmentBookingEn from './requirements/appointment_booking_en.requirements.json';
 import outOfScopeAr from './requirements/out_of_scope_ar.requirements.json';
 import vagueIdeaEn from './requirements/vague_idea_en.requirements.json';
+// Real Architect outputs (Naifah, PR #4, contract 0.3.0-proposal) where a sample exists.
+import archTaskManagerEn from './architecture/task_manager_en.architecture.json';
+import archInventoryDialectAr from './architecture/inventory_dialect_ar.architecture.json';
+import archAppointmentBookingEn from './architecture/appointment_booking_en.architecture.json';
+
+export const ARCHITECTURES = {
+  task_manager_en: archTaskManagerEn,
+  inventory_dialect_ar: archInventoryDialectAr,
+  appointment_booking_en: archAppointmentBookingEn,
+};
 
 export const SAMPLES = {
   task_manager_en: taskManagerEn,
@@ -30,7 +40,7 @@ const normalize = (s) => s.trim().replace(/\s+/g, ' ').toLowerCase();
 
 const KEYWORDS = [
   // checked first: anything that is clearly outside the CRUD MVP
-  { key: 'out_of_scope_ar', re: /دفع|جوال|آيفون|اندرويد|أندرويد|دردشة|payment|iphone|android|mobile app|chat/i },
+  { key: 'out_of_scope_ar', re: /دفع|تطبيق جوال|تطبيق للجوال|آيفون|اندرويد|أندرويد|دردشة|لعبة|ألعاب|payment|iphone|android|mobile app|chat|game/i },
   { key: 'inventory_dialect_ar', re: /مخزون|منتج|بضاع|مستودع/ },
   { key: 'inventory_manager_ar', re: /inventory|stock|product/i },
   { key: 'appointment_booking_en', re: /موعد|مواعيد|حجز|appointment|booking|clinic/i },

@@ -1,6 +1,8 @@
 // Real backend client (FastAPI, owner: Alanoud).
 // Matches PR #5: POST /projects takes { "prompt" }, projects are identified by "project_id".
 // Endpoints/fields not in PR #5 yet are marked "proposed" in frontend/README.md.
+import { MSG, REQUEST_TIMEOUT_MS } from '../lib/messages.js';
+
 const BASE = (import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000').replace(/\/$/, '');
 
 export class ApiError extends Error {
@@ -12,13 +14,18 @@ export class ApiError extends Error {
 
 async function request(path, options = {}) {
   let res;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
     res = await fetch(`${BASE}${path}`, {
       headers: { 'Content-Type': 'application/json', ...(options.headers ?? {}) },
+      signal: controller.signal,
       ...options,
     });
-  } catch {
-    throw new ApiError(0, 'تعذّر الاتصال بالخادم. تأكد أن الباك إند يعمل.');
+  } catch (e) {
+    throw new ApiError(0, e.name === 'AbortError' ? MSG.timeout : MSG.serverDown);
+  } finally {
+    clearTimeout(timer);
   }
   if (!res.ok) {
     let message = `خطأ من الخادم (${res.status})`;
@@ -63,15 +70,21 @@ async function fullProject(id, body) {
   return isFullProject(body) ? normalize(body) : getProject(id);
 }
 
-export const createProject = async (idea) =>
-  normalize(await request('/projects', { method: 'POST', body: JSON.stringify({ prompt: idea }) }));
+export async function createProject(idea) {
+  try {
+    return normalize(await request('/projects', { method: 'POST', body: JSON.stringify({ prompt: idea }) }));
+  } catch (e) {
+    if (e.status === 422) throw new ApiError(422, MSG.unclearIdea);
+    throw e;
+  }
+}
 
 export async function getProject(id) {
   try {
     return normalize(await request(`/projects/${encodeURIComponent(id)}`));
   } catch (e) {
     // 404 = unknown id, 422 = not a UUID (PR #5 validates the path)
-    if (e.status === 404 || e.status === 422) throw new ApiError(e.status, 'المشروع غير موجود');
+    if (e.status === 404 || e.status === 422) throw new ApiError(404, MSG.notFound);
     throw e;
   }
 }
