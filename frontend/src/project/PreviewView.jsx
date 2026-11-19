@@ -3,6 +3,7 @@ import { getPreviewHtml, previewUrl } from '../api/client.js';
 import Icon from '../components/icons.jsx';
 import { projectSlug } from '../lib/labels.js';
 import { MSG } from '../lib/messages.js';
+import { qaSummary } from '../lib/qa.js';
 
 /** "المعاينة": the generated app in a sandboxed frame, desktop or phone width. */
 export default function PreviewView({ project }) {
@@ -22,13 +23,14 @@ export default function PreviewView({ project }) {
 
   if (!ready) return <p className="muted" style={{ paddingTop: 'var(--bn-s5)' }}>{MSG.previewUnavailable}</p>;
 
-  const m = project.metrics;
+  const qa = qaSummary(project);
+  const COLOR = { done: 'var(--bn-success)', failed: 'var(--bn-danger)', waiting: 'var(--bn-warning)', neutral: 'var(--bn-text-muted)' };
   return (
     <div style={{ display: 'grid', gap: 'var(--bn-s3)', paddingTop: 'var(--bn-s5)' }} data-testid="preview-view">
       <div className="preview-bar">
-        {m ? (
-          <span className="small" style={{ color: m.checks_passed === m.checks_total ? 'var(--bn-success)' : 'var(--bn-warning)' }}>
-            اجتاز {m.checks_passed} من {m.checks_total} فحوصات
+        {qa.text !== '—' ? (
+          <span className="small" style={{ color: COLOR[qa.tone] }} data-testid="preview-qa" data-qa={qa.status}>
+            {qa.text}
           </span>
         ) : <span />}
         <div className="actions">

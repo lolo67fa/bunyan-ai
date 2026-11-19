@@ -109,7 +109,22 @@ export function metricsFromReport(report, runTimeSeconds) {
     pass_rate: report.summary.pass_rate,
     checks_passed: report.summary.passed,
     checks_total: report.summary.total,
+    checks_failed: report.summary.failed,
+    checks_skipped: report.summary.skipped ?? 0,
+    checks_not_run: report.summary.not_run ?? 0,
     run_time_seconds: runTimeSeconds,
+  };
+}
+
+/** Project.qa as backend/orchestrator/qa_stage.py stores it (summary()). */
+export function qaFromReport(report) {
+  const ids = (st) => report.checks.filter((c) => c.status === st).map((c) => c.id);
+  return {
+    status: report.summary.failed > 0 ? 'failed' : 'passed',
+    attempt: report.run?.attempt ?? 0,
+    failed_checks: ids('failed'),
+    skipped_checks: ids('skipped'),
+    warnings: [],
   };
 }
 

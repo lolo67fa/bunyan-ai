@@ -3,6 +3,7 @@ import Icon from '../components/icons.jsx';
 import { Notice, StatusText, Tabs } from '../components/ui.jsx';
 import { goToProject, projectHref } from '../hooks/useHashRoute.js';
 import { useProjectPolling } from '../hooks/useProjectPolling.js';
+import { hasGeneratedApp } from '../constants/stages.js';
 import { STAGES, projectStatus, projectSlug } from '../lib/labels.js';
 import { MSG } from '../lib/messages.js';
 import { forgetProject } from '../lib/prefs.js';
@@ -48,6 +49,13 @@ function subtitle(project) {
   const s = project.status;
   if (s === 'analyzing' || s === 'created') return <span className="muted small">يقرأ محلّل الأعمال فكرتك ويكتب المتطلبات.</span>;
   if (s === 'awaiting_approval') return <StatusText tone="waiting">المتطلبات بانتظار موافقتك</StatusText>;
+  if (s === 'failed') {
+    return (
+      <a className="small" href={projectHref(project.project_id)}>
+        ← توقف البناء · التطبيق متاح للمعاينة والتحميل
+      </a>
+    );
+  }
   if (s === 'completed') {
     return (
       <div className="stage-links">
@@ -106,7 +114,9 @@ export default function ProjectPage({ id, tab }) {
   if (s === 'awaiting_clarification' && project.requirements && !tab) {
     return <>{errorBar}<ClarificationView project={project} onDone={resume} /></>;
   }
-  if (s === 'rejected' || s === 'failed') return <StoppedView project={project} />;
+  // A failed run that still produced the app keeps its tabs (preview, files, report).
+  const appReady = hasGeneratedApp(project);
+  if (s === 'rejected' || (s === 'failed' && !(tab && appReady))) return <StoppedView project={project} />;
   if (s === 'completed' && !tab) return <DeliveryView project={project} />;
 
   const req = project.requirements;
@@ -130,7 +140,7 @@ export default function ProjectPage({ id, tab }) {
           <span className="sr-only" data-testid="project-status">{projectStatus(project).text}</span>
         </div>
         {s === 'awaiting_approval' && <ReviewActions project={project} onDone={resume} />}
-        {s === 'completed' && (
+        {(s === 'completed' || (s === 'failed' && appReady)) && (
           <div className="actions">
             <a className="btn" href={projectHref(project.project_id, 'preview')}>معاينة</a>
             {zip ? (

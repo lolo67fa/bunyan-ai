@@ -3,6 +3,7 @@ import { AGENTS, agentState } from '../constants/stages.js';
 import { projectHref } from '../hooks/useHashRoute.js';
 import { formatDuration } from '../lib/labels.js';
 import { WAIT } from '../lib/messages.js';
+import { qaSummary, repairCount } from '../lib/qa.js';
 import Icon from './icons.jsx';
 
 const NAMES = {
@@ -56,6 +57,7 @@ function detail(key, state, project, demo) {
         );
       }
       if (state === 'active') return <span className="step-state">يصمّم الهيكل</span>;
+      if (state === 'failed') return <span>تعذّر تصميم الهيكل</span>;
       return <span>يبدأ بعد موافقتك على المتطلبات</span>;
     case 'developer': {
       if (state === 'pending') return <span>يبدأ بعد المهندس · 3 ملفات</span>;
@@ -71,22 +73,28 @@ function detail(key, state, project, demo) {
       if (s === 'repairing') {
         return (
           <span>
-            <span className="step-state">يصلح عيباً · المحاولة {project.repair_attempt} من 2</span>
+            <span className="step-state">يصلح عيباً · المحاولة {repairCount(project) || 1} من 2</span>
           </span>
         );
       }
+      if (state === 'failed') return <span>تعذّر توليد الملفات</span>;
       if (state === 'active') return <span><span className="step-state">يكتب الملفات</span>{files}</span>;
       return <span>index.html · style.css · app.js</span>;
     }
-    case 'qa_tester':
-      if (state === 'done' && project.metrics) {
-        return <span>اجتاز {project.metrics.checks_passed} من {project.metrics.checks_total} فحوصات · <A href={demo ? undefined : projectHref(id, 'tests')}>التقرير</A></span>;
-      }
+    case 'qa_tester': {
+      const qa = qaSummary(project);
+      const report = has(project, 'test_report.json') ? (
+        <> · <A href={demo ? undefined : projectHref(id, 'tests')}>التقرير</A></>
+      ) : null;
       if (state === 'active') return <span className="step-state">يشغّل 8 فحوصات في متصفح حقيقي</span>;
-      if (state === 'done') return <span>اكتملت الفحوصات</span>;
+      if (state === 'failed' || qa.status === 'blocked') return <span data-qa={qa.status}>تعذّر اختبار التطبيق{report}</span>;
+      if (qa.status === 'not_run') return <span data-qa="not_run">لم يُشغَّل الاختبار</span>;
+      if (state === 'done') return <span data-qa={qa.status}>{qa.text === '—' ? 'اكتملت الفحوصات' : qa.text}{report}</span>;
       return <span>يبدأ بعد المطوّر · 8 فحوصات</span>;
+    }
     case 'project_manager':
       if (state === 'active') return <span className="step-state">يكتب الخطة والمخاطر</span>;
+      if (state === 'failed') return <span>تعذّر كتابة الخطة والمخاطر</span>;
       if (state === 'done') return <span>الخطة والمخاطر · <A href={demo ? undefined : projectHref(id, 'plan')}>عرض</A></span>;
       return <span>الخطة والمخاطر</span>;
     default:

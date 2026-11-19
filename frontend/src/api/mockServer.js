@@ -9,6 +9,7 @@ import {
   mockArchitecture,
   mockTestReport,
   metricsFromReport,
+  qaFromReport,
   mockProjectPlan,
   mockRisks,
   mockPreviewHtml,
@@ -152,10 +153,9 @@ function toProject(rec) {
     project.error = { code: 'out_of_scope', message: 'الفكرة خارج نطاق النسخة الأولى (CRUD فقط).' };
   }
   if (step.status === 'completed') {
-    project.metrics = metricsFromReport(
-      latestReport(rec, project),
-      Math.round((step.at - rec.approved_at) / 1000),
-    );
+    const report = latestReport(rec, project);
+    project.metrics = metricsFromReport(report, Math.round((step.at - rec.approved_at) / 1000));
+    project.qa = qaFromReport(report);
   }
   return project;
 }

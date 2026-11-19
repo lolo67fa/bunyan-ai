@@ -1,3 +1,6 @@
+import { hasGeneratedApp } from '../constants/stages.js';
+import { qaSummary } from './qa.js';
+
 // Arabic wording used across screens. Keep user-facing text here so the
 // tone stays the same everywhere: short, plain, the user's own words.
 
@@ -38,9 +41,10 @@ export function projectStatus(p) {
 /** "المتطلبات · 1 من 5" or "مكتمل · اجتاز 8 من 8 فحوصات" */
 export function projectStage(p) {
   if (p.status === 'completed') {
-    const m = p.metrics;
-    return m ? `مكتمل · اجتاز ${m.checks_passed} من ${m.checks_total} فحوصات` : 'مكتمل';
+    const qa = qaSummary(p);
+    return qa.text === '—' ? 'مكتمل' : `مكتمل · ${qa.text}`;
   }
+  if (p.status === 'failed' && hasGeneratedApp(p)) return 'توقف · التطبيق متاح';
   const i = STAGE_OF_STATUS[p.status] ?? 0;
   return `${STAGES[i].label} · ${i + 1} من ${STAGES.length}`;
 }

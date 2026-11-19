@@ -1,8 +1,11 @@
 import { downloadUrl } from '../api/client.js';
 import Icon from '../components/icons.jsx';
+import { Notice } from '../components/ui.jsx';
+import { hasArtifact } from '../constants/stages.js';
 import { projectHref } from '../hooks/useHashRoute.js';
 import { projectSlug } from '../lib/labels.js';
 import { MSG } from '../lib/messages.js';
+import { qaSummary } from '../lib/qa.js';
 
 const FILES = [
   ['index.html', 'الصفحة والنموذج'],
@@ -10,15 +13,40 @@ const FILES = [
   ['app.js', 'الإضافة والتعديل والحذف والحفظ'],
 ];
 
-/** "تطبيقك جاهز!": shown when the run has completed. */
-export default function DeliveryView({ project }) {
-  const req = project.requirements;
-  const m = project.metrics;
+/** Preview and ZIP buttons; shared by the delivery screen and a failed run that still produced the app. */
+export function AppActions({ project }) {
   const id = project.project_id;
   const zip = downloadUrl(id);
   const name = `${projectSlug(project)}.zip`;
+  return (
+    <>
+      <div className="actions">
+        {zip ? (
+          <a className="btn btn-primary" href={zip} download={name} data-testid="download-zip">
+            <Icon name="download" size={16} /> تحميل <span className="mono ltr">{name}</span>
+          </a>
+        ) : (
+          <button type="button" className="btn btn-primary" disabled title={MSG.downloadNotReady}>
+            <Icon name="download" size={16} /> تحميل <span className="mono ltr">{name}</span>
+          </button>
+        )}
+        <a className="btn" href={projectHref(id, 'preview')} data-testid="open-preview">
+          <Icon name="eye" size={16} /> فتح المعاينة
+        </a>
+      </div>
+      {!zip && <p className="muted small">يتوفر ملف ZIP عند ربط الخادم.</p>}
+    </>
+  );
+}
+
+/** "تطبيقك جاهز!": shown when the run has completed. The headline follows project.qa.status. */
+export default function DeliveryView({ project }) {
+  const req = project.requirements;
+  const id = project.project_id;
   const entity = req?.entities?.[0];
-  const passedAll = m && m.checks_passed === m.checks_total;
+  const qa = qaSummary(project);
+  const hasReport = hasArtifact(project, 'test_report.json');
+  const hasPlan = hasArtifact(project, 'project_plan.md');
 
   return (
     <div className="page page-narrow" data-testid="delivery">
@@ -27,28 +55,20 @@ export default function DeliveryView({ project }) {
       </nav>
 
       <div style={{ display: 'grid', gap: 'var(--bn-s3)', justifyItems: 'start' }}>
-        <span className={`result-mark${passedAll ? '' : ' warn'}`}>
-          <Icon name={passedAll ? 'check' : 'alert'} size={20} />
+        <span className={`result-mark${qa.ok ? '' : ' warn'}`}>
+          <Icon name={qa.ok ? 'check' : 'alert'} size={20} />
         </span>
-        <h1 className="title">{passedAll ? 'تطبيقك جاهز!' : 'تطبيقك جاهز مع ملاحظات'}</h1>
+        <h1 className="title" data-testid="delivery-title">{qa.ok ? 'تطبيقك جاهز!' : 'تطبيقك جاهز مع ملاحظات'}</h1>
         <p className="lead">
           {req?.app?.name}: {req?.app?.description}
         </p>
-        <div className="actions">
-          {zip ? (
-            <a className="btn btn-primary" href={zip} download={name} data-testid="download-zip">
-              <Icon name="download" size={16} /> تحميل <span className="mono ltr">{name}</span>
-            </a>
-          ) : (
-            <button type="button" className="btn btn-primary" disabled title={MSG.downloadNotReady}>
-              <Icon name="download" size={16} /> تحميل <span className="mono ltr">{name}</span>
-            </button>
-          )}
-          <a className="btn" href={projectHref(id, 'preview')}>
-            <Icon name="eye" size={16} /> فتح المعاينة
-          </a>
-        </div>
-        {!zip && <p className="muted small">يتوفر ملف ZIP عند ربط الخادم.</p>}
+        {qa.note && (
+          <Notice tone={qa.status === 'not_run' ? undefined : 'error'} testId="qa-note">
+            {qa.note}
+            {qa.failedChecks.length > 0 && <span className="mono ltr"> ({qa.failedChecks.join(', ')})</span>}
+          </Notice>
+        )}
+        <AppActions project={project} />
       </div>
 
       <section className="section">
@@ -67,8 +87,9 @@ export default function DeliveryView({ project }) {
         <h2 className="section-title">الملخص</h2>
         <dl className="kv" style={{ margin: 0 }}>
           <dt>الاختبار</dt>
-          <dd>
-            {m ? `${m.checks_passed} من ${m.checks_total} ناجحة` : '—'} · <a href={projectHref(id, 'tests')}>التقرير</a>
+          <dd data-testid="qa-summary" data-qa={qa.status}>
+            {qa.text}
+            {hasReport && <> · <a href={projectHref(id, 'tests')}>التقرير</a></>}
           </dd>
           <dt>المتطلبات</dt>
           <dd>
@@ -77,7 +98,7 @@ export default function DeliveryView({ project }) {
           <dt>الهيكل</dt>
           <dd><a href={projectHref(id, 'structure')}>وثيقة الهيكل</a></dd>
           <dt>الخطة</dt>
-          <dd><a href={projectHref(id, 'plan')}>الخطة والمخاطر</a></dd>
+          <dd>{hasPlan ? <a href={projectHref(id, 'plan')}>الخطة والمخاطر</a> : 'لم تُكتب'}</dd>
         </dl>
       </section>
 

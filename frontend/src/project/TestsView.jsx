@@ -1,5 +1,7 @@
 import { Notice, StatusText } from '../components/ui.jsx';
 import { checkLabels, formatDuration } from '../lib/labels.js';
+import { MSG } from '../lib/messages.js';
+import { QA_NOTES, repairCount } from '../lib/qa.js';
 import { useArtifact } from './useArtifact.js';
 
 const RESULT = {
@@ -18,8 +20,16 @@ export default function TestsView({ project }) {
   const entity = project.requirements?.entities?.[0]?.label ?? 'السجل';
   const names = checkLabels(entity);
   const s = r.summary;
-  const attempt = r.run?.attempt ?? project.repair_attempt ?? 0;
-  const final = s.all_passed ? ['ناجح', 'done'] : ['لم ينجح', 'failed'];
+  const attempt = r.run?.attempt ?? 0;
+  // A repair is mentioned only when the backend made one; the report's attempt alone is not enough.
+  const repairs = Math.min(repairCount(project), attempt);
+  const status = project.qa?.status ?? (s.all_passed ? 'passed' : 'failed');
+  const final = {
+    passed: ['ناجح', 'done'],
+    failed: ['لم ينجح', 'failed'],
+    blocked: ['غير مؤكد', 'waiting'],
+    not_run: ['لم يُشغَّل', 'neutral'],
+  }[status] ?? ['لم ينجح', 'failed'];
 
   return (
     <div style={{ display: 'grid', gap: 'var(--bn-s4)', paddingTop: 'var(--bn-s5)' }} data-testid="tests-view">
@@ -27,7 +37,7 @@ export default function TestsView({ project }) {
         <div className="score">
           <b>{s.passed}</b>
           <span className="lead">من {s.total} فحوصات ناجحة</span>
-          <StatusText tone={final[1]}>النتيجة النهائية: {final[0]}</StatusText>
+          <StatusText tone={final[1]}><span data-testid="qa-final" data-qa={status}>النتيجة النهائية: {final[0]}</span></StatusText>
         </div>
         <span className="muted small">
           التشغيل {attempt + 1}
@@ -35,17 +45,27 @@ export default function TestsView({ project }) {
         </span>
       </div>
 
-      {attempt > 0 && s.all_passed && (
-        <Notice>
-          فشل فحص في التشغيل الأول، وأصلحه المطوّر في المحاولة {attempt} من 2، ثم نجحت الفحوصات الثمانية كلها.
+      {repairs > 0 && status === 'passed' && (
+        <Notice testId="repair-note">
+          فشل فحص في التشغيل الأول، وأصلحه المطوّر في المحاولة {repairs} من 2، ثم نجحت الفحوصات كلها.
         </Notice>
       )}
-      {!s.all_passed && (
-        <Notice tone={attempt >= 2 ? 'error' : 'waiting'}>
-          {attempt >= 2
-            ? 'ما زال فحص يفشل بعد محاولتين. يمكنك تحميل الكود مع تقرير العيوب.'
-            : `فشل ${s.failed} من ${s.total} فحوصات. أُرسل العيب للمطوّر لإصلاحه.`}
+      {status === 'failed' && (
+        <Notice tone="error" testId="qa-note">
+          {project.status === 'repairing'
+            ? MSG.repairSent(s.failed, s.total)
+            : repairs >= 2
+              ? MSG.repairsExhausted
+              : MSG.checksFailed(s.failed, s.total)}
         </Notice>
+      )}
+      {(status === 'blocked' || status === 'not_run') && (
+        <Notice tone="waiting" testId="qa-note">{QA_NOTES[status]}</Notice>
+      )}
+      {status === 'passed' && s.skipped > 0 && (
+        <p className="muted small" data-testid="qa-skipped">
+          {s.skipped} فحوصات لم تنطبق على هذا التطبيق، ولا تُحسب ناجحة.
+        </p>
       )}
 
       <div className="table-wrap">
@@ -78,7 +98,7 @@ export default function TestsView({ project }) {
         </table>
       </div>
       <p className="muted small">
-        يشغّل مختبر الجودة ثمانية فحوصات على التطبيق في متصفح حقيقي. إذا فشل فحص يصلحه المطوّر، بحد أقصى محاولتان.
+        يشغّل مختبر الجودة ثمانية فحوصات على التطبيق في متصفح حقيقي، ويسجّل نتيجة كل فحص وسبب أي فشل.
       </p>
     </div>
   );
