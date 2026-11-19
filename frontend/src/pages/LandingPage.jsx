@@ -94,8 +94,8 @@ function AgentsDiagram({ active, onSelect, isolated }) {
     <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="رسم يوضح خمسة وكلاء حول طبقة تنسيق واحدة" className={isolated ? 'lx-isolated' : undefined}>
       <defs>
         <radialGradient id="lx-hub-fill" cx="50%" cy="40%" r="70%">
-          <stop offset="0%" stopColor="#4a3b8f" />
-          <stop offset="100%" stopColor="#1e1b4b" />
+          <stop offset="0%" style={{ stopColor: "color-mix(in srgb, var(--lx-violet) 45%, var(--lx-indigo))" }} />
+          <stop offset="100%" style={{ stopColor: "var(--lx-indigo)" }} />
         </radialGradient>
       </defs>
       <polyline className="lx-chain" points={nodes.map((n) => `${n.x},${n.y}`).join(' ')} />
@@ -112,16 +112,16 @@ function AgentsDiagram({ active, onSelect, isolated }) {
         <circle className="orbit" cx={C.x} cy={C.y} r="76" />
         <circle className="core" cx={C.x} cy={C.y} r="56" />
         <g transform={`translate(${C.x - 14} ${C.y - 30})`}>
-          <rect x="6" y="0" width="10" height="10" rx="1.6" fill="#eceeec" transform="scale(1.3)" />
-          <rect x="0" y="12" width="10" height="10" rx="1.6" fill="#4cc2b0" transform="scale(1.3)" />
-          <rect x="12" y="12" width="10" height="10" rx="1.6" fill="#eceeec" transform="scale(1.3)" />
+          <rect x="6" y="0" width="10" height="10" rx="1.6" style={{ fill: "var(--bn-brand-ink)" }} transform="scale(1.3)" />
+          <rect x="0" y="12" width="10" height="10" rx="1.6" style={{ fill: "var(--bn-brand)" }} transform="scale(1.3)" />
+          <rect x="12" y="12" width="10" height="10" rx="1.6" style={{ fill: "var(--bn-brand-ink)" }} transform="scale(1.3)" />
         </g>
-        <text x={C.x} y={C.y + 24} textAnchor="middle" fontSize="12" fill="#c8c4da">طبقة التنسيق</text>
+        <text x={C.x} y={C.y + 24} textAnchor="middle" fontSize="12" style={{ fill: "var(--lx-text-2)" }}>طبقة التنسيق</text>
       </g>
       <g className="lx-person" aria-hidden="true">
-        <circle cx={C.x} cy={C.y - 16} r="12" fill="none" stroke="#9692ae" strokeWidth="1.4" />
-        <path d={`M${C.x - 22} ${C.y + 22} q22 -26 44 0`} fill="none" stroke="#9692ae" strokeWidth="1.4" />
-        <text x={C.x} y={C.y + 46} textAnchor="middle" fontSize="12" fill="#9692ae">أنت تنسّق يدوياً</text>
+        <circle cx={C.x} cy={C.y - 16} r="12" fill="none" style={{ stroke: "var(--lx-muted)" }} strokeWidth="1.4" />
+        <path d={`M${C.x - 22} ${C.y + 22} q22 -26 44 0`} fill="none" style={{ stroke: "var(--lx-muted)" }} strokeWidth="1.4" />
+        <text x={C.x} y={C.y + 46} textAnchor="middle" fontSize="12" style={{ fill: "var(--lx-muted)" }}>أنت تنسّق يدوياً</text>
       </g>
       {nodes.map((n) => (
         <g

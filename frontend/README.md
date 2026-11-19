@@ -17,7 +17,7 @@ npm run dev                  # http://localhost:5173
 
 ## Screens
 
-Built to the approved design (direction C, calm green). Tokens: `src/styles/tokens.css`; brand files: `brand/`.
+Colours follow the approved Riyadh visual theme (PR #13), shared by the landing page and every screen through design tokens: `src/styles/tokens.css` (mirrored in `brand/tokens.json`); brand files: `brand/`.
 
 | Route | Screen | File |
 |---|---|---|

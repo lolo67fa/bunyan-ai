@@ -1,23 +1,24 @@
 /* Bunyan landing page: "من الرياض" — a cinematic night-time Riyadh.
-   Scoped to .lx so the product screens keep the platform identity.
+   Scoped to .lx. Colours come from the shared Riyadh palette in tokens.css;
+   this page always uses its night version, whatever theme the platform is in.
    One deliberate dark look: deep navy and purple, lavender for text accents,
    champagne gold only for small details (coordinates, numbers, rules). */
 
 .lx {
-  --lx-midnight: #0b0d1f;   /* page ground */
-  --lx-navy: #121634;       /* raised sections */
-  --lx-indigo: #1e1b4b;     /* cards, diagram ground */
-  --lx-purple: #3b1e6e;     /* deep purple glow */
-  --lx-violet: #7c6bb0;     /* muted violet: lines, borders on hover */
-  --lx-lavender: #c9bff2;   /* accents, primary button */
-  --lx-silver: #b8bccb;     /* secondary text on dark */
-  --lx-gold: #e3c998;       /* champagne: small details only */
+  --lx-midnight: var(--bn-riyadh-midnight);   /* page ground */
+  --lx-navy: var(--bn-riyadh-navy);       /* raised sections */
+  --lx-indigo: var(--bn-riyadh-indigo);     /* cards, diagram ground */
+  --lx-purple: var(--bn-riyadh-purple);     /* deep purple glow */
+  --lx-violet: var(--bn-riyadh-violet);     /* muted violet: lines, borders on hover */
+  --lx-lavender: var(--bn-riyadh-lavender);   /* accents, primary button */
+  --lx-silver: var(--bn-riyadh-silver);     /* secondary text on dark */
+  --lx-gold: var(--bn-riyadh-gold);       /* champagne: small details only */
   --lx-text: #f4f2fa;       /* headings and body on dark (17:1 on midnight) */
   --lx-text-2: #c8c4da;     /* body on dark (11:1) */
   --lx-muted: #9692ae;      /* captions (6.4:1) */
   --lx-line: rgb(201 191 242 / 0.14);
   --lx-glass: rgb(30 27 75 / 0.48);
-  --lx-on-primary: #17123a;
+  --lx-on-primary: var(--bn-riyadh-ink);
   --lx-radius: 14px;
   --lx-radius-sm: 10px;
   --lx-max: 1200px;

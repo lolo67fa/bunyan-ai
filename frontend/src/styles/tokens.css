@@ -1,24 +1,38 @@
 /* Bunyan design tokens — the single source for colour, type, spacing and shape.
-   Values come from the approved identity ("الهوية والتوكنز", direction C · calm green).
-   Mirror of brand/tokens.json; change both together. Contrast ratios are on white. */
+   Colours follow the approved Riyadh visual theme (PR #13): midnight navy, indigo,
+   deep purple, soft lavender and a little champagne gold. The landing page and the
+   platform read the same palette; screens only use the semantic tokens below.
+   Mirror of brand/tokens.json; change both together. Contrast ratios are on the page background. */
 
 :root {
+  /* Riyadh palette (raw values: use the semantic tokens in screens) */
+  --bn-riyadh-midnight: #0b0d1f;
+  --bn-riyadh-navy: #121634;
+  --bn-riyadh-indigo: #1e1b4b;
+  --bn-riyadh-purple: #3b1e6e;
+  --bn-riyadh-violet: #7c6bb0;
+  --bn-riyadh-lavender: #c9bff2;
+  --bn-riyadh-silver: #b8bccb;
+  --bn-riyadh-gold: #e3c998;
+  --bn-riyadh-ink: #17123a;
+
   /* Neutrals */
   --bn-bg: #ffffff;           /* page background */
-  --bn-bg-subtle: #fafaf8;    /* side bar, quiet panels */
-  --bn-selected: #eceae5;     /* selected item */
-  --bn-border: #eae8e3;       /* borders and dividers */
-  --bn-text: #1c1f1e;         /* primary text · 16.6:1 */
-  --bn-text-2: #3f4441;       /* body text · 9.9:1 */
-  --bn-text-muted: #6b6f6c;   /* secondary and helper text · 5.1:1 */
+  --bn-bg-subtle: #f8f7fc;    /* side bar, quiet panels (lavender tint) */
+  --bn-selected: #ece8f8;     /* selected item */
+  --bn-border: #e6e2f2;       /* borders and dividers */
+  --bn-text: #17123a;         /* primary text, Riyadh ink · 17.7:1 */
+  --bn-text-2: #3b3560;       /* body text · 11.3:1 */
+  --bn-text-muted: #676184;   /* secondary and helper text · 5.8:1 */
 
   /* Brand */
-  --bn-accent: #0f6e62;       /* primary action and links · 6.1:1 */
-  --bn-accent-hover: #0c5c52;
-  --bn-accent-soft: #e8f3f1;  /* focus ring fill, selected tab tint */
+  --bn-accent: #5b3fa8;       /* primary action and links, deep purple · 7.7:1 */
+  --bn-accent-hover: #4a3290;
+  --bn-accent-soft: #efebfb;  /* focus ring fill, selected tab tint */
   --bn-brand: #168477;        /* logo only */
   --bn-brand-ink: #14403a;    /* logo's dark blocks only */
   --bn-on-accent: #ffffff;
+  --bn-highlight: #8a6a2f;    /* champagne gold for small details only · 5.0:1 */
 
   /* Status */
   --bn-success: #1e7a43;      /* done, passed · 5.4:1 */
@@ -31,11 +45,11 @@
   --bn-danger-line: #f3c9c3;
 
   /* Overlays */
-  --bn-scrim: rgb(18 21 20 / 0.42);
-  --bn-shadow-float: 0 12px 32px rgb(18 21 20 / 0.14), 0 2px 6px rgb(18 21 20 / 0.06);
-  --bn-toast-bg: #1c1f1e;
+  --bn-scrim: rgb(11 13 31 / 0.45);
+  --bn-shadow-float: 0 12px 32px rgb(23 18 58 / 0.14), 0 2px 6px rgb(23 18 58 / 0.06);
+  --bn-toast-bg: #17123a;
   --bn-toast-fg: #ffffff;
-  --bn-code-bg: #fafaf8;
+  --bn-code-bg: #f8f7fc;
 
   /* Type */
   --bn-font: 'IBM Plex Sans Arabic', 'IBM Plex Sans', 'Segoe UI', Tahoma, sans-serif;
@@ -72,64 +86,67 @@
   color-scheme: light;
 }
 
+/* Dark: the landing page's night palette (PR #13). */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --bn-bg: #121514;
-    --bn-bg-subtle: #171b19;
-    --bn-selected: #242a27;
-    --bn-border: #2b302e;
-    --bn-text: #eceeec;
-    --bn-text-2: #c7ccc9;
-    --bn-text-muted: #a4aaa7;
-    --bn-accent: #4cc2b0;
-    --bn-accent-hover: #6fd1c2;
-    --bn-accent-soft: #15302b;
+    --bn-bg: var(--bn-riyadh-midnight);
+    --bn-bg-subtle: var(--bn-riyadh-navy);
+    --bn-selected: var(--bn-riyadh-indigo);
+    --bn-border: #262a4d;
+    --bn-text: #f4f2fa;
+    --bn-text-2: #c8c4da;
+    --bn-text-muted: #9692ae;
+    --bn-accent: var(--bn-riyadh-lavender);
+    --bn-accent-hover: #ddd6fb;
+    --bn-accent-soft: #241f52;
     --bn-brand: #4cc2b0;
     --bn-brand-ink: #eceeec;
-    --bn-on-accent: #0b1f1c;
+    --bn-on-accent: var(--bn-riyadh-ink);
+    --bn-highlight: var(--bn-riyadh-gold);
     --bn-success: #6bcb8e;
     --bn-warning: #e8b25a;
     --bn-danger: #ff8a7d;
-    --bn-success-soft: #14241a;
-    --bn-warning-soft: #2a2213;
+    --bn-success-soft: #13262a;
+    --bn-warning-soft: #2a2218;
     --bn-warning-line: #4a3a1c;
-    --bn-danger-soft: #2c1714;
-    --bn-danger-line: #55261f;
+    --bn-danger-soft: #2c1724;
+    --bn-danger-line: #55263a;
     --bn-scrim: rgb(0 0 0 / 0.6);
-    --bn-shadow-float: 0 12px 32px rgb(0 0 0 / 0.5), 0 0 0 1px #2b302e;
-    --bn-toast-bg: #eceeec;
-    --bn-toast-fg: #121514;
-    --bn-code-bg: #171b19;
+    --bn-shadow-float: 0 12px 32px rgb(0 0 0 / 0.5), 0 0 0 1px #262a4d;
+    --bn-toast-bg: #f4f2fa;
+    --bn-toast-fg: var(--bn-riyadh-ink);
+    --bn-code-bg: var(--bn-riyadh-navy);
     color-scheme: dark;
   }
 }
 
 :root[data-theme='dark'] {
-  --bn-bg: #121514;
-  --bn-bg-subtle: #171b19;
-  --bn-selected: #242a27;
-  --bn-border: #2b302e;
-  --bn-text: #eceeec;
-  --bn-text-2: #c7ccc9;
-  --bn-text-muted: #a4aaa7;
-  --bn-accent: #4cc2b0;
-  --bn-accent-hover: #6fd1c2;
-  --bn-accent-soft: #15302b;
+  --bn-bg: var(--bn-riyadh-midnight);
+  --bn-bg-subtle: var(--bn-riyadh-navy);
+  --bn-selected: var(--bn-riyadh-indigo);
+  --bn-border: #262a4d;
+  --bn-text: #f4f2fa;
+  --bn-text-2: #c8c4da;
+  --bn-text-muted: #9692ae;
+  --bn-accent: var(--bn-riyadh-lavender);
+  --bn-accent-hover: #ddd6fb;
+  --bn-accent-soft: #241f52;
   --bn-brand: #4cc2b0;
   --bn-brand-ink: #eceeec;
-  --bn-on-accent: #0b1f1c;
+  --bn-on-accent: var(--bn-riyadh-ink);
+  --bn-highlight: var(--bn-riyadh-gold);
   --bn-success: #6bcb8e;
   --bn-warning: #e8b25a;
   --bn-danger: #ff8a7d;
-  --bn-success-soft: #14241a;
-  --bn-warning-soft: #2a2213;
+  --bn-success-soft: #13262a;
+  --bn-warning-soft: #2a2218;
   --bn-warning-line: #4a3a1c;
-  --bn-danger-soft: #2c1714;
-  --bn-danger-line: #55261f;
+  --bn-danger-soft: #2c1724;
+  --bn-danger-line: #55263a;
   --bn-scrim: rgb(0 0 0 / 0.6);
-  --bn-shadow-float: 0 12px 32px rgb(0 0 0 / 0.5), 0 0 0 1px #2b302e;
-  --bn-toast-bg: #eceeec;
-  --bn-toast-fg: #121514;
-  --bn-code-bg: #171b19;
+  --bn-shadow-float: 0 12px 32px rgb(0 0 0 / 0.5), 0 0 0 1px #262a4d;
+  --bn-toast-bg: #f4f2fa;
+  --bn-toast-fg: var(--bn-riyadh-ink);
+  --bn-code-bg: var(--bn-riyadh-navy);
   color-scheme: dark;
 }

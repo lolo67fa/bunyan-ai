@@ -1,7 +1,7 @@
 # Bunyan brand assets
 
-The approved identity (direction C, calm green) as files. The full brand guide lives in the
-team's design-system page; this folder is the source the code uses.
+The approved identity as files. Colours follow the Riyadh visual theme (PR #13); the logo
+keeps its approved shape and colours. This folder is the source the code uses.
 
 ## Files
 
@@ -12,7 +12,7 @@ team's design-system page; this folder is the source the code uses.
 | `logo/bunyan-mark*.svg` | The mark alone (Arabic, English, dark, single colour) |
 | `logo/bunyan-app-icon*.svg` | App icon, 512 px |
 | `../public/favicon.svg` | Browser icon, follows the device theme |
-| `tokens.json` | Colours (light and dark), type scale, spacing, radii, logo rules |
+| `tokens.json` | Riyadh palette, colours (light and dark), type scale, spacing, radii, logo rules |
 | `../src/styles/tokens.css` | The same tokens as CSS variables, used by every screen |
 
 ## Logo rules
@@ -26,6 +26,9 @@ team's design-system page; this folder is the source the code uses.
 
 ## Colour rules
 
+- One palette for the whole product: `--bn-riyadh-*` in `tokens.css`. Screens use the semantic tokens (`--bn-bg`, `--bn-text`, `--bn-accent`…), never the raw palette; the landing page (`landing.css`) maps its own names to the same raw values.
+- Light theme: white and lavender-tinted surfaces, Riyadh ink text, deep purple accent. Dark theme: the landing page's night palette (midnight, navy, indigo, lavender accent).
+- `--bn-highlight` (champagne gold) is for small details only: numbers, coordinates, thin rules. Never for text blocks or buttons.
 - `--bn-accent` is for the primary action and links only.
 - `--bn-brand` and `--bn-brand-ink` are for the logo only.
 - Status is coloured text with a dot, always with a word.
