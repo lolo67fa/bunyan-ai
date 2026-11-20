@@ -32,7 +32,7 @@ on:
         options: [one-call, journey]
         default: one-call
       idea:
-        description: journey only - the application idea (Arabic or English)
+        description: the application idea (Arabic or English), for both tests
         required: false
         default: "أبغى موقع لإدارة المخزون أقدر أضيف فيه المنتجات وأعدل كمياتها وأسعارها وأحذف المنتجات."
       feedback:
@@ -99,7 +99,8 @@ jobs:
       - name: Run one real analysis
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: python -m backend.agents.business_analyst.live_check --out live-test-output
+          IDEA: ${{ inputs.idea }}   # passed as data, never pasted into the script
+        run: python -m backend.agents.business_analyst.live_check --out live-test-output --idea "$IDEA"
 
       - name: Show the summary on the run page
         if: always()
