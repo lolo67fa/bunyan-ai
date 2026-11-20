@@ -1,6 +1,8 @@
-// Reads requirements.json (Ghala's contract) and derives everything the fixed
-// suite needs: entity, fields, which fields to fill, and valid sample values.
-// Field names are copied from requirements.json, never invented here.
+// Reads requirements.json (Ghala's contract) and, when given, architecture.json
+// (Naifah's contract, 0.3.0) and derives everything the fixed suite needs:
+// entity, fields, which fields to fill, valid sample values, the texts that
+// must match verbatim (rule M1) and number display formats.
+// Field names are copied from these files, never invented here.
 
 const fs = require('fs');
 const path = require('path');
@@ -11,13 +13,36 @@ const REPO_DIR = path.resolve(E2E_DIR, '..', '..');
 const DEFAULT_REQUIREMENTS = path.join(
   REPO_DIR, 'backend', 'agents', 'business_analyst', 'samples', 'outputs', 'task_manager_en.requirements.json',
 );
+const DEFAULT_ARCHITECTURE = path.join(
+  REPO_DIR, 'backend', 'agents', 'architect', 'samples', 'outputs', 'task_manager_en.architecture.json',
+);
 const DEFAULT_APP_DIR = path.join(E2E_DIR, 'fixtures', 'task-manager');
 
 const TEXT_TYPES = ['string', 'text', 'email', 'phone', 'url'];
-const EMPTIABLE_TYPES = [...TEXT_TYPES, 'integer', 'decimal', 'date', 'time', 'datetime'];
+// Required fields of these types can be left empty in a form. A select can be left
+// empty only when it has no default (architecture: `empty_option`).
+const EMPTIABLE_TYPES = [...TEXT_TYPES, 'integer', 'decimal', 'date', 'time', 'datetime', 'enum'];
+
+// verbatim_messages paths (architecture §6) → the element whose text must match, and
+// the check that compares it. Field rules (entity.fields.<f>.messages.required) are
+// compared by error_message_visible.
+const VERBATIM_TARGETS = {
+  'screens.form.save_button': { testid: 'btn-save', check: 'create_item' },
+  'messages.delete_button': { testid: 'btn-delete', check: 'delete_item' },
+  'messages.confirm_button': { testid: 'btn-confirm-delete', check: 'delete_item' },
+  'messages.confirm_delete': { testid: 'confirm-delete-text', check: 'delete_item' },
+  'messages.empty': { testid: 'empty-state', check: 'empty_state' },
+};
 
 function requirementsPath() {
   return path.resolve(process.env.REQUIREMENTS || DEFAULT_REQUIREMENTS);
+}
+
+/** Path of architecture.json, or null when none is given and the default sample does not exist. */
+function architecturePath() {
+  if (process.env.ARCHITECTURE) return path.resolve(process.env.ARCHITECTURE);
+  const usesDefaultRequirements = requirementsPath() === path.resolve(DEFAULT_REQUIREMENTS);
+  return usesDefaultRequirements && fs.existsSync(DEFAULT_ARCHITECTURE) ? DEFAULT_ARCHITECTURE : null;
 }
 
 function appDir() {
@@ -67,6 +92,35 @@ function loadRequirements() {
     throw new Error(`Cannot test ${rel(file)}:\n- ${problems.join('\n- ')}`);
   }
   return { doc, entity, file };
+}
+
+/**
+ * Reads architecture.json when one is given. Returns null without it: the suite then
+ * only checks that messages are visible and skips verbatim and format checks.
+ */
+function loadArchitecture(entityName) {
+  const file = architecturePath();
+  if (!file) return null;
+  if (!fs.existsSync(file)) throw new Error(`architecture.json not found: ${file}`);
+  const doc = JSON.parse(fs.readFileSync(file, 'utf8'));
+  if (doc.entity?.name !== entityName) {
+    throw new Error(`architecture.json is for entity "${doc.entity?.name}", requirements.json for "${entityName}"`);
+  }
+  return { doc, file };
+}
+
+/** Texts that must match exactly (rule M1), keyed by path: { text, source }. */
+function verbatimMap(arch) {
+  const map = {};
+  for (const v of arch?.doc.verbatim_messages ?? []) map[v.path] = { text: v.text, source: v.source };
+  return map;
+}
+
+/** Verbatim paths the 8 checks cannot compare (e.g. no_results: search is not one of the 8). */
+function uncoveredVerbatim(arch) {
+  return (arch?.doc.verbatim_messages ?? []).filter(
+    (v) => !VERBATIM_TARGETS[v.path] && !/^entity\.fields\.[^.]+\.messages\.required$/.test(v.path),
+  );
 }
 
 function pad2(n) {
@@ -132,7 +186,7 @@ function sampleValue(field, tag) {
  * the display field and every list column. Returns the plan plus any reason
  * the suite cannot build valid input (e.g. a regex it cannot satisfy).
  */
-function buildPlan(entity) {
+function buildPlan(entity, arch = null) {
   const listFields = entity.crud?.read?.list_fields ?? [];
   const fill = entity.fields.filter(
     (f) => f.required || f.name === entity.display_field || listFields.includes(f.name),
@@ -152,7 +206,16 @@ function buildPlan(entity) {
     listFields,
     fill,
     required,
-    emptiable: required.filter((f) => EMPTIABLE_TYPES.includes(f.type)),
+    // A required field with a default is pre-filled, so it is not expected to be empty
+    // (AC-2 rule, Business Analyst PR #8). A required select without a default starts empty.
+    emptiable: required.filter((f) => f.default == null && EMPTIABLE_TYPES.includes(f.type)),
+    verbatim: verbatimMap(arch),
+    // { field: decimals } from architecture display_format, for list columns
+    formats: Object.fromEntries(
+      (arch?.doc.entity.fields ?? [])
+        .filter((f) => f.display_format && listFields.includes(f.name))
+        .map((f) => [f.name, f.display_format.decimals]),
+    ),
     problems,
   };
 }
@@ -167,11 +230,15 @@ function recordValues(plan, tag) {
 module.exports = {
   E2E_DIR,
   REPO_DIR,
+  VERBATIM_TARGETS,
   requirementsPath,
+  architecturePath,
   appDir,
   isHarnessFixture,
   rel,
   loadRequirements,
+  loadArchitecture,
+  uncoveredVerbatim,
   buildPlan,
   recordValues,
 };
