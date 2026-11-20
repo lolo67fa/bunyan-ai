@@ -183,20 +183,42 @@ def error_response(request: Request, exc: HTTPException) -> Response:
     title = _ERROR_TITLES.get(exc.status_code, "حدث خطأ")
     detail = html.escape(str(exc.detail))
     page = f"""<!doctype html>
-<html lang="ar" dir="rtl"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<html lang="ar" dir="rtl" data-theme="light"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F8F7FC">
 <title>بُنيان: {title}</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;600;700&display=swap">
+<script>/* the same theme choice as the app (bunyan.prefs, light by default) */
+try{{var t=(JSON.parse(localStorage.getItem('bunyan.prefs'))||{{}}).theme||'light';
+if(t==='system')document.documentElement.removeAttribute('data-theme');else document.documentElement.setAttribute('data-theme',t);}}catch(e){{}}</script>
 <style>
-:root{{color-scheme:light dark;--bg:#F8F7FC;--card:#fff;--text:#1B1D3A;--muted:#5B5F7A;--accent:#5B3FD9}}
-@media (prefers-color-scheme:dark){{:root{{--bg:#0B0D1F;--card:#15183A;--text:#F1F0FA;--muted:#A9ACC9;--accent:#9C87FF}}}}
-body{{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--bg);color:var(--text);
-font-family:system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;padding:16px;box-sizing:border-box}}
-main{{background:var(--card);max-width:440px;width:100%;border-radius:16px;padding:28px;text-align:center;
-box-shadow:0 8px 30px rgba(0,0,0,.08)}}
-h1{{font-size:1.4rem;margin:0 0 12px}}p{{color:var(--muted);line-height:1.7;margin:0 0 20px}}
-a{{display:inline-block;background:var(--accent);color:#fff;text-decoration:none;padding:10px 22px;border-radius:10px}}
+:root{{--bn-bg:#ffffff;--bn-bg-subtle:#f8f7fc;--bn-border:#e6e2f2;--bn-text:#17123a;--bn-text-2:#3b3560;
+--bn-accent:#5b3fa8;--bn-accent-hover:#4a3290;--bn-on-accent:#ffffff;
+--bn-shadow:0 12px 32px rgb(23 18 58 / .14),0 2px 6px rgb(23 18 58 / .06);
+--bn-font:'IBM Plex Sans Arabic','IBM Plex Sans','Segoe UI',Tahoma,sans-serif;color-scheme:light}}
+@media (prefers-color-scheme:dark){{:root:not([data-theme='light']){{--bn-bg:#0b0d1f;--bn-bg-subtle:#121634;--bn-border:#262a4d;
+--bn-text:#f4f2fa;--bn-text-2:#c8c4da;--bn-accent:#c9bff2;--bn-accent-hover:#ddd6fb;--bn-on-accent:#17123a;
+--bn-shadow:0 12px 32px rgb(0 0 0 / .5),0 0 0 1px #262a4d;color-scheme:dark}}}}
+:root[data-theme='dark']{{--bn-bg:#0b0d1f;--bn-bg-subtle:#121634;--bn-border:#262a4d;--bn-text:#f4f2fa;--bn-text-2:#c8c4da;
+--bn-accent:#c9bff2;--bn-accent-hover:#ddd6fb;--bn-on-accent:#17123a;--bn-shadow:0 12px 32px rgb(0 0 0 / .5),0 0 0 1px #262a4d;color-scheme:dark}}
+*{{box-sizing:border-box}}
+body{{margin:0;min-height:100vh;display:grid;place-items:center;padding:16px;background:var(--bn-bg-subtle);
+color:var(--bn-text);font-family:var(--bn-font);line-height:1.7}}
+main{{background:var(--bn-bg);border:1px solid var(--bn-border);border-radius:12px;box-shadow:var(--bn-shadow);
+max-width:460px;width:100%;padding:32px 28px;text-align:center}}
+.brand{{display:inline-flex;align-items:center;gap:8px;font-weight:700;margin-bottom:20px;color:var(--bn-text)}}
+.brand img{{width:24px;height:24px}}
+h1{{font-size:1.375rem;font-weight:700;margin:0 0 8px}}
+p{{color:var(--bn-text-2);margin:0 0 24px}}
+a.btn{{display:inline-block;background:var(--bn-accent);color:var(--bn-on-accent);text-decoration:none;font-weight:600;
+padding:10px 24px;border-radius:8px}}
+a.btn:hover{{background:var(--bn-accent-hover)}}
+a.btn:focus-visible{{outline:3px solid var(--bn-accent);outline-offset:3px}}
 </style></head>
-<body><main><h1>{title}</h1><p>{detail}</p><a href="/">العودة إلى بُنيان</a></main></body></html>"""
+<body><main><div class="brand"><img src="/favicon.svg" alt="">بُنيان</div>
+<h1>{title}</h1><p>{detail}</p><a class="btn" href="/">العودة إلى بُنيان</a></main></body></html>"""
     headers = {k: v for k, v in (exc.headers or {}).items() if k.lower() != "www-authenticate"} \
         if exc.status_code != 401 else (exc.headers or {})
     return Response(page, status_code=exc.status_code, headers=headers, media_type="text/html; charset=utf-8")
