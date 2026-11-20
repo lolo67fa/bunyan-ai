@@ -92,6 +92,18 @@ def test_direct_backend_uses_the_token_cap_and_request_timeout(monkeypatch):
     assert build_request("p", _settings(max_tokens=20000))["max_tokens"] == 20000
 
 
+def test_each_model_call_logs_its_token_usage_without_secrets(caplog, monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", SECRET)
+    message = SimpleNamespace(stop_reason="end_turn", stop_details=None, _request_id="req_usage", model="claude-opus-5-5",
+                              usage=SimpleNamespace(input_tokens=6113, output_tokens=10163),
+                              content=[SimpleNamespace(type="text", text="{}")])
+    client = SimpleNamespace(beta=SimpleNamespace(messages=SimpleNamespace(stream=lambda **r: _FakeStream(message))))
+    with caplog.at_level("INFO", logger="bunyan.business_analyst"):
+        run_direct("prompt", _settings(), client=client)
+    assert "input_tokens=6113 output_tokens=10163" in caplog.text and "req_usage" in caplog.text
+    assert SECRET not in caplog.text and "prompt" not in caplog.text.split("BA model call:")[1]
+
+
 # ---------- feedback reaches the model with the reviewed version ----------
 
 def test_feedback_prompt_carries_the_reviewed_requirements(task_doc):

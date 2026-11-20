@@ -12,6 +12,7 @@ Anthropic models only. Other providers use the CrewAI backend.
 from __future__ import annotations
 
 import inspect
+import logging
 from typing import Any, Callable, Dict, Optional
 
 from .config import ConfigError, Settings
@@ -22,6 +23,8 @@ SYSTEM_PROMPT = f"You are a {ROLE}.\nGoal: {GOAL}\n{BACKSTORY}\nOutput format: {
 # Models that accept the server-side refusal fallback (`fallbacks: "default"`).
 _FALLBACK_MODELS = {"claude-fable-5-1", "claude-opus-5-5", "claude-opus-5", "claude-sonnet-5-5"}
 _FALLBACK_BETA = "server-side-fallback-2026-07-01"
+
+logger = logging.getLogger("bunyan.business_analyst")
 
 MAX_TOKENS = 64000  # default output cap (BA_MAX_TOKENS); a full requirements document is long, and streaming avoids HTTP timeouts
 
@@ -88,6 +91,11 @@ def run_direct(
     stream_fn = client.beta.messages.stream
     with stream_fn(**adapt_to_sdk(build_request(description, settings), stream_fn)) as stream:
         message = stream.get_final_message()
+    usage = getattr(message, "usage", None)
+    # One line per paid call, for cost tracking. No prompt text, no credentials.
+    logger.info("BA model call: model=%s input_tokens=%s output_tokens=%s stop_reason=%s request_id=%s",
+                getattr(message, "model", settings.model), getattr(usage, "input_tokens", None),
+                getattr(usage, "output_tokens", None), message.stop_reason, getattr(message, "_request_id", None))
     if on_message is not None:
         on_message(message)
 
