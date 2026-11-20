@@ -29,6 +29,24 @@ browser ──HTTPS──► platform edge (TLS) ──► container :$PORT
 | Container | Non-root user (uid 10001); the entrypoint only fixes `/data` ownership, then drops privileges. Compose drops all other capabilities, sets `no-new-privileges`, 2 GB RAM, 2 CPUs, 512 processes. |
 | Paths | Project ids are UUIDs; artifact and preview names come from a fixed list and are resolved inside the project folder. |
 
+## Guest mode (no login)
+
+`BUNYAN_AUTH=guest` lets visitors start without a login, with the same server-side checks:
+
+- On the first request the server issues an anonymous guest identity: 24 random bytes from
+  `secrets`, with its issue time, signed with HMAC-SHA256 (`BUNYAN_SESSION_SECRET`), in a cookie
+  that is `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`, 7 days. A changed, forged or expired
+  cookie is replaced by a new, empty guest.
+- Each guest is its own owner: other guests get 404 on every route. Guests never see projects
+  made in login mode.
+- Limits: `BUNYAN_MAX_PROJECTS_PER_USER_PER_DAY` per guest (3 for the club), plus per address
+  (`BUNYAN_MAX_PROJECTS_PER_IP_PER_DAY`, new guest cookies per hour, write requests per minute)
+  and for the whole site (`BUNYAN_MAX_PROJECTS_PER_DAY`), so clearing cookies cannot buy
+  unlimited projects. A whole club on one Wi-Fi shares one address: size the per-address limits for it.
+- Writes from another site are refused (Origin check, plus SameSite).
+- Guest mode refuses to start unless `BA_MODE=mock`: anonymous visitors never cause paid requests.
+- Rollback: set `BUNYAN_AUTH=required` again (the `BUNYAN_USERS` logins still work).
+
 ## Run locally (Docker Compose)
 
 ```bash

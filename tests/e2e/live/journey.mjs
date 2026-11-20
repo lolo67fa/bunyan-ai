@@ -31,8 +31,13 @@ const step = (name, extra = {}) => {
   report.steps.push({ name, at_seconds: Math.round((Date.now() - started) / 1000), ...extra });
   console.log(`[${Math.round((Date.now() - started) / 1000)}s] ${name}`, Object.keys(extra).length ? JSON.stringify(extra) : '');
 };
+// Without a login (guest mode) the API requests carry the browser's guest cookie, so they
+// read the same guest's projects.
+let context = null;
+const identity = async () =>
+  USER || !context ? AUTH : { Cookie: (await context.cookies()).map((c) => `${c.name}=${c.value}`).join('; ') };
 const api = async (path) => {
-  const res = await fetch(`${API}${path}`, { headers: AUTH });
+  const res = await fetch(`${API}${path}`, { headers: await identity() });
   if (!res.ok) throw new Error(`GET ${path}: ${res.status}`);
   return res.headers.get('content-type')?.includes('json') ? res.json() : res.text();
 };
@@ -49,7 +54,7 @@ const waitForStatus = (id, done, timeout) => waitFor(id, (p) => done.includes(p.
 const STOPPED = ['awaiting_approval', 'awaiting_clarification', 'rejected', 'failed'];
 
 const browser = await chromium.launch();
-const context = await browser.newContext({
+context = await browser.newContext({
   viewport: { width: 1280, height: 900 },
   locale: 'ar',
   ...(USER ? { httpCredentials: { username: USER, password: PASSWORD ?? '' } } : {}),
@@ -119,7 +124,7 @@ try {
   report.final = { status: project.status, qa: project.qa, metrics: project.metrics, error: project.error };
 
   // 5. What was delivered
-  const zip = await fetch(`${API}/projects/${id}/download`, { headers: AUTH });
+  const zip = await fetch(`${API}/projects/${id}/download`, { headers: await identity() });
   report.zip = { status: zip.status, type: zip.headers.get('content-type'), bytes: (await zip.arrayBuffer()).byteLength };
   if (project.status === 'completed') {
     const architecture = await api(`/projects/${id}/artifacts/architecture.json`);

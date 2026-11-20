@@ -128,36 +128,64 @@ async def access_control(request: Request, call_next):
     is kept on request.state for the ownership checks. CORS is not authentication.
     """
     request.state.user = None
-    if request.url.path != "/health" and security.auth_required():
-        client = request.client.host if request.client else "unknown"
+    client = request.client.host if request.client else "unknown"
+    request.state.client = client
+    new_cookie = None
+    mode = security.auth_mode()
+    if request.url.path != "/health" and mode != "off":
         try:
-            request.state.user = await run_in_threadpool(
-                security.authenticator.authenticate, request.headers.get("authorization"), client
-            )
+            if mode == "required":
+                request.state.user = await run_in_threadpool(
+                    security.authenticator.authenticate, request.headers.get("authorization"), client
+                )
+            else:  # guest: an anonymous identity from a signed cookie, issued on the first visit
+                if request.method not in ("GET", "HEAD", "OPTIONS") and not same_origin(request):
+                    raise HTTPException(403, "Requests from other sites are not accepted.")
+                request.state.user, new_cookie = security.guest_sessions.identify(
+                    request.cookies.get(security.GUEST_COOKIE), client
+                )
         except HTTPException as exc:
             return JSONResponse({"detail": exc.detail}, status_code=exc.status_code, headers=exc.headers)
     response = await call_next(request)
+    if new_cookie:
+        response.set_cookie(
+            security.GUEST_COOKIE, new_cookie, max_age=security.GUEST_SESSION_SECONDS, path="/",
+            httponly=True, samesite="lax",
+            secure=os.environ.get("BUNYAN_COOKIE_SECURE", "true").strip().lower() != "false",
+        )
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("Referrer-Policy", "no-referrer")
     return response
+
+
+def same_origin(request):
+    """A browser sends Origin with cross-site writes; it must be this site (SameSite=Lax also blocks them)."""
+    origin = request.headers.get("origin")
+    return origin is None or origin == f"{request.url.scheme}://{request.url.netloc}"
 
 
 def current_user(request: Request):
     return getattr(request.state, "user", None)
 
 
-def enforce_limits(user, new_project=False, analysis=False):
+def current_client(request: Request):
+    return getattr(request.state, "client", "unknown")
+
+
+def enforce_limits(user, new_project=False, analysis=False, client="unknown"):
     """Rate and quota checks for a shared deployment. Returns True when an LLM slot was taken."""
-    if not security.auth_required():
+    if not security.shared_deployment():
         return False
-    security.limits.check_rate(user)
+    security.limits.check_rate(user, client)
     if not analysis:
         return False
     try:
         llm = get_ba_settings().mode == "llm"
     except ConfigError:
         llm = False  # the analysis will fail with "ba_not_configured" without calling a model
-    security.limits.reserve(user, new_project=new_project, llm=llm)
+    if llm and security.auth_mode() == "guest":
+        raise HTTPException(403, "Real analysis is not available to guests.")  # startup refuses this too
+    security.limits.reserve(user, new_project=new_project, llm=llm, client=client)
     return llm
 
 
@@ -383,8 +411,9 @@ def finish_analysis(project, answers=None, feedback=None, settings=None):
 
 
 @app.post("/projects", status_code=201)
-def create_project(data: ProjectRequest, background_tasks: BackgroundTasks, user=Depends(current_user)):
-    llm_slot = enforce_limits(user, new_project=True, analysis=True)
+def create_project(data: ProjectRequest, background_tasks: BackgroundTasks, user=Depends(current_user),
+                   client=Depends(current_client)):
+    llm_slot = enforce_limits(user, new_project=True, analysis=True, client=client)
     timestamp = now_iso()
     project = {
         "project_id": str(uuid.uuid4()),
@@ -411,10 +440,11 @@ def get_project_pipeline(project_id: uuid.UUID, user=Depends(current_user)):
 
 @app.post("/projects/{project_id}/approve")
 def approve_project(
-    project_id: uuid.UUID, data: ApprovalRequest, background_tasks: BackgroundTasks, user=Depends(current_user)
+    project_id: uuid.UUID, data: ApprovalRequest, background_tasks: BackgroundTasks, user=Depends(current_user),
+    client=Depends(current_client),
 ):
     get_existing_project(project_id, user)  # 404 for someone else's project, before any limit is counted
-    llm_slot = enforce_limits(user, analysis=not data.approved)
+    llm_slot = enforce_limits(user, analysis=not data.approved, client=client)
     with _approval_lock:
         project = get_existing_project(project_id, user)
         if project["status"] != "awaiting_approval":
@@ -443,13 +473,13 @@ def approve_project(
 
 @app.post("/projects/{project_id}/answers")
 def submit_answers(project_id: uuid.UUID, data: AnswersRequest, background_tasks: BackgroundTasks,
-                   user=Depends(current_user)):
+                   user=Depends(current_user), client=Depends(current_client)):
     project = get_existing_project(project_id, user)
     if project["status"] != "awaiting_clarification":
         raise HTTPException(status_code=409, detail="Project is not awaiting clarification")
     if not data.answers or not any(value.strip() for value in data.answers.values()):
         raise HTTPException(status_code=422, detail="At least one non-empty answer is required")
-    llm_slot = enforce_limits(user, analysis=True)
+    llm_slot = enforce_limits(user, analysis=True, client=client)
     # Answers from earlier rounds are kept; a new answer to the same question replaces the old one.
     project["answers"] = {**(project.get("answers") or {}), **data.answers}
     return start_analysis(project, background_tasks, "answers", answers=project["answers"], llm_slot=llm_slot)
