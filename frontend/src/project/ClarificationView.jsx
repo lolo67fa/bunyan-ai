@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { submitAnswers } from '../api/client.js';
 import { useToast } from '../components/ui.jsx';
 import { go } from '../hooks/useHashRoute.js';
+import AnalysisNotices from './AnalysisNotices.jsx';
 import { saveDraft } from './draft.js';
 
 const OTHER = '__other__';
@@ -73,6 +74,7 @@ export default function ClarificationView({ project, onDone }) {
         </button>
       </div>
 
+      <AnalysisNotices project={project} />
       <form onSubmit={onSubmit} noValidate data-testid="clarification-form">
         {questions.map((q) => (
           <fieldset

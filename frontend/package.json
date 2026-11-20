@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node --test tests/stages.test.mjs tests/qa.test.mjs",
+    "test": "node --test tests/stages.test.mjs tests/qa.test.mjs tests/analysis.test.mjs",
     "sync-samples": "node scripts/sync-samples.mjs"
   },
   "dependencies": {

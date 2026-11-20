@@ -46,6 +46,8 @@ class Settings:
     effort: str = "high"      # Anthropic output_config.effort (direct backend)
     fallbacks: bool = True    # server-side refusal fallback (direct backend); a fallback is a second, billed attempt
     sdk_max_retries: Optional[int] = None  # Anthropic SDK transport retries (direct backend); None = SDK default (2)
+    request_timeout: float = 300.0  # seconds per model request (direct backend)
+    max_tokens: int = 64000   # output cap per model request (direct backend)
 
     @property
     def litellm_model(self) -> str:
@@ -79,6 +81,28 @@ def _env(*names: str) -> Optional[str]:
     return None
 
 
+def _positive_number(name: str, default: float, cast=float):
+    raw = _env(name)
+    if raw is None:
+        return default
+    try:
+        value = cast(raw)
+    except ValueError:
+        raise ConfigError(f"{name} must be a positive number, got '{raw}'") from None
+    if value <= 0:
+        raise ConfigError(f"{name} must be a positive number, got '{raw}'")
+    return value
+
+
+def _non_negative_int(name: str, default: Optional[int]) -> Optional[int]:
+    raw = _env(name)
+    if raw is None:
+        return default
+    if not raw.isdigit():
+        raise ConfigError(f"{name} must be a whole number of 0 or more, got '{raw}'")
+    return int(raw)
+
+
 def get_settings(mode: Optional[str] = None) -> Settings:
     load_dotenv_if_available()
     resolved_mode = (mode or _env("BA_MODE") or "mock").lower()
@@ -95,16 +119,17 @@ def get_settings(mode: Optional[str] = None) -> Settings:
     fallbacks = (_env("BA_FALLBACKS") or "on").lower()
     if fallbacks not in {"on", "off"}:
         raise ConfigError(f"BA_FALLBACKS must be 'on' or 'off', got '{fallbacks}'")
-    sdk_retries = _env("BA_SDK_MAX_RETRIES")
     return Settings(
         mode=resolved_mode,
         provider=provider.lower() if provider else None,
         model=_env("BA_LLM_MODEL", "LLM_MODEL"),
         temperature=float(temperature) if temperature else None,
-        max_retries=int(_env("BA_MAX_RETRIES") or 2),
+        max_retries=_non_negative_int("BA_MAX_RETRIES", 2),
         verbose=(_env("BA_VERBOSE") or "false").lower() in {"1", "true", "yes"},
         backend=backend,
         effort=effort,
         fallbacks=fallbacks == "on",
-        sdk_max_retries=int(sdk_retries) if sdk_retries is not None else None,
+        sdk_max_retries=_non_negative_int("BA_SDK_MAX_RETRIES", None),
+        request_timeout=_positive_number("BA_REQUEST_TIMEOUT", 300.0),
+        max_tokens=_positive_number("BA_MAX_TOKENS", 64000, int),
     )

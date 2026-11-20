@@ -23,7 +23,7 @@ SYSTEM_PROMPT = f"You are a {ROLE}.\nGoal: {GOAL}\n{BACKSTORY}\nOutput format: {
 _FALLBACK_MODELS = {"claude-fable-5-1", "claude-opus-5-5", "claude-opus-5", "claude-sonnet-5-5"}
 _FALLBACK_BETA = "server-side-fallback-2026-07-01"
 
-MAX_TOKENS = 64000  # a full requirements document is long; streaming avoids HTTP timeouts
+MAX_TOKENS = 64000  # default output cap (BA_MAX_TOKENS); a full requirements document is long, and streaming avoids HTTP timeouts
 
 
 class LLMRefusal(RuntimeError):
@@ -39,7 +39,7 @@ def build_request(description: str, settings: Settings) -> Dict[str, Any]:
         raise ConfigError("Set BA_LLM_MODEL or LLM_MODEL (for example claude-opus-5-5).")
     request: Dict[str, Any] = {
         "model": model,
-        "max_tokens": MAX_TOKENS,
+        "max_tokens": settings.max_tokens,
         "system": SYSTEM_PROMPT,
         "messages": [{"role": "user", "content": description}],
         "output_config": {"effort": settings.effort},
@@ -81,7 +81,9 @@ def run_direct(
         import anthropic
 
         # Credentials from ANTHROPIC_API_KEY / ANTHROPIC_AUTH_TOKEN.
-        options = {} if settings.sdk_max_retries is None else {"max_retries": settings.sdk_max_retries}
+        options = {"timeout": settings.request_timeout}
+        if settings.sdk_max_retries is not None:
+            options["max_retries"] = settings.sdk_max_retries
         client = anthropic.Anthropic(**options)
     stream_fn = client.beta.messages.stream
     with stream_fn(**adapt_to_sdk(build_request(description, settings), stream_fn)) as stream:
@@ -94,5 +96,5 @@ def run_direct(
         category = getattr(details, "category", None) if details else None
         raise LLMRefusal(f"model refused the request (category: {category}, request id: {message._request_id})")
     if message.stop_reason == "max_tokens":
-        raise LLMRefusal(f"answer was cut off at max_tokens={MAX_TOKENS} (request id: {message._request_id})")
+        raise LLMRefusal(f"answer was cut off at max_tokens={settings.max_tokens} (request id: {message._request_id})")
     return "".join(block.text for block in message.content if block.type == "text")

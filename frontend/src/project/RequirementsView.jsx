@@ -3,6 +3,7 @@ import { approveRequirements } from '../api/client.js';
 import { Dialog, useToast } from '../components/ui.jsx';
 import { FIELD_TYPES, fieldRules } from '../lib/labels.js';
 import { MSG } from '../lib/messages.js';
+import AnalysisNotices from './AnalysisNotices.jsx';
 
 /** Request-changes dialog ("طلب تعديل المتطلبات"). */
 export function FeedbackDialog({ project, onClose, onDone }) {
@@ -102,6 +103,7 @@ export default function RequirementsView({ project, onDone }) {
 
   return (
     <div data-testid="requirements-view">
+      <AnalysisNotices project={project} />
       {reviewing && (
         <p className="muted small" style={{ paddingBottom: 'var(--bn-s4)' }}>
           راجع المتطلبات التالية. بعد موافقتك يبدأ المهندس بتصميم الهيكل بناءً عليها.

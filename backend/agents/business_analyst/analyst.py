@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from pydantic import ValidationError
 
@@ -114,9 +114,12 @@ def analyze(
     mode: Optional[str] = None,
     settings: Optional[Settings] = None,
     llm_generator: Optional[Generator] = None,
+    previous_requirements: Optional[Dict[str, Any]] = None,
 ) -> RequirementsDocument:
     """Run the Business Analyst Agent on one idea and return a validated document.
 
+    ``previous_requirements`` is the document the user reviewed; with ``feedback`` the
+    LLM revises it instead of starting over (mock mode ignores both).
     ``llm_generator`` replaces the CrewAI call (used by tests to simulate LLM answers).
     """
     request = AnalystInput(idea=idea, answers=answers or {}, feedback=feedback)
@@ -137,7 +140,8 @@ def analyze(
     raw: Optional[str] = None
     for _attempt in range(settings.max_retries + 1):
         description = build_task_description(
-            request.idea, language, request.answers, request.feedback, errors or None, raw
+            request.idea, language, request.answers, request.feedback, errors or None, raw,
+            previous_requirements=previous_requirements,
         )
         try:
             raw = generator(description, settings)

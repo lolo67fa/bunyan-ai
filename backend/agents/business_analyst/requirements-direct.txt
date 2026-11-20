@@ -1,0 +1,6 @@
+# Business Analyst Agent: LLM mode with the direct Anthropic backend (BA_LLM_BACKEND=direct).
+# Small install: the Anthropic SDK only, no CrewAI. Includes everything in requirements.txt.
+#   pip install -r backend/agents/business_analyst/requirements-direct.txt
+# The same SDK version as the manual live-test workflow (.github/workflows/ba-live-test.yml). Needs Python 3.10+.
+-r requirements.txt
+anthropic==1.8.0
