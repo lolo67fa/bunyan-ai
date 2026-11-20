@@ -708,6 +708,7 @@
   "app.js"
  ],
  "repair_attempt": 1,
+ "repair_loop_available": true,
  "run_time_seconds": 62,
  "stage_seconds": {
   "structure": 9,

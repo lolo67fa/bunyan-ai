@@ -16,7 +16,9 @@ from typing import Any, Callable, Dict, List, Optional
 
 from backend.agents.architect import ArchitectureError, build_architecture
 from backend.agents.developer import DeveloperError, generate
-from backend.agents.project_manager import PLAN_FILE, RISKS_FILE, write_documents
+from backend.agents.project_manager import OUTPUT_FILES, run_project_manager, write_outputs
+
+PLAN_FILE, RISKS_FILE = OUTPUT_FILES
 from backend.agents.qa_tester.runner import run_qa
 from backend.orchestrator.qa_stage import (
     QA_BLOCKED,
@@ -213,7 +215,22 @@ def _document(
         if _is_real_file(workdir / rel):
             sizes[Path(rel).name] = (workdir / rel).stat().st_size
     try:
-        write_documents(requirements, architecture, workdir, qa_report=qa_report, run=project, files=sizes)
+        result = run_project_manager(
+            {
+                "project_id": project.get("project_id"),
+                "status": "documenting",
+                "requirements": requirements,
+                "architecture": architecture,
+                "test_report": qa_report,
+                "qa": project.get("qa"),
+                "generated_files": [name for name in APP_FILES if _is_real_file(workdir / APP_DIRNAME / name)],
+                "repair_attempt": project.get("repair_attempt") or 0,
+                "repair_loop_available": False,  # no repair strategy exists yet: never claim one
+                "run_time_seconds": (project.get("metrics") or {}).get("run_time_seconds"),
+            },
+            mode="rules",  # the pipeline never makes a paid call for the documents
+        )
+        write_outputs(result, workdir)
     except OSError as exc:
         raise _StageFailure("documentation_failed", f"Could not write the project documents: {_describe(exc)}") from exc
     except Exception as exc:

@@ -977,5 +977,6 @@
   "app.js"
  ],
  "repair_attempt": 2,
+ "repair_loop_available": true,
  "run_time_seconds": 141
 }

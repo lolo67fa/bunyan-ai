@@ -39,6 +39,12 @@ class PMInput(BaseModel):
         default_factory=list, description="Files the Developer produced, e.g. index.html, style.css, app.js."
     )
     repair_attempt: int = Field(0, ge=0, le=2, description="Repair attempts used (max 2).")
+    repair_loop_available: bool = Field(
+        False, description="True only when the orchestrator really sends failed checks back to the Developer. "
+                           "Without it no text claims or promises a repair.")
+    qa: Optional[Dict[str, Any]] = Field(
+        None, description="The orchestrator's QA outcome: {status: passed|failed|blocked|not_run, reason}. "
+                          "Tells a run where QA was switched off or blocked from one that passed.")
     run_time_seconds: Optional[float] = Field(None, ge=0, description="Approval to now, whole pipeline.")
     stage_seconds: Dict[str, float] = Field(
         default_factory=dict,

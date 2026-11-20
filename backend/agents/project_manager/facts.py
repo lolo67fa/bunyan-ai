@@ -46,7 +46,11 @@ class Facts:
     checks_passed: int = 0
     checks_failed: int = 0
     checks_skipped: int = 0
+    checks_not_run: int = 0
     all_passed: bool = False
+    qa_status: Optional[str] = None      # passed | failed | blocked | not_run (None: unknown)
+    qa_reason: Optional[str] = None
+    repair_loop_available: bool = False
     failed_checks: List[Dict[str, str]] = field(default_factory=list)   # [{id, message}]
     qa_attempt: int = 0
     qa_blocked_reason: Optional[str] = None
@@ -105,6 +109,7 @@ def collect(data: PMInput) -> Facts:
         workflow_status=data.status,
         generated_files=list(data.generated_files),
         repair_attempt=data.repair_attempt,
+        repair_loop_available=data.repair_loop_available,
         run_time_seconds=data.run_time_seconds,
         stage_seconds=dict(data.stage_seconds),
     )
@@ -130,7 +135,8 @@ def collect(data: PMInput) -> Facts:
         f.checks_total = int(summary.get("total") or len(checks))
         f.checks_passed = int(summary.get("passed") or sum(1 for c in checks if c.get("status") == "passed"))
         f.checks_failed = int(summary.get("failed") or sum(1 for c in checks if c.get("status") == "failed"))
-        f.checks_skipped = int((summary.get("skipped") or 0) + (summary.get("not_run") or 0))
+        f.checks_skipped = int(summary.get("skipped") or 0)
+        f.checks_not_run = int(summary.get("not_run") or 0)
         f.all_passed = bool(summary.get("all_passed", f.checks_total > 0 and f.checks_passed == f.checks_total))
         f.failed_checks = [
             {"id": _text(c.get("id")), "message": _text((c.get("error") or {}).get("message")) if isinstance(c.get("error"), dict) else ""}
@@ -141,4 +147,10 @@ def collect(data: PMInput) -> Facts:
         f.qa_blocked_reason = _text(run.get("blocked_reason")) or None
         # The QA report is the most reliable source for repairs used.
         f.repair_attempt = max(f.repair_attempt, f.qa_attempt)
+        f.qa_status = ("blocked" if f.qa_blocked_reason or f.checks_not_run else
+                       "failed" if f.checks_failed else "passed" if f.all_passed else None)
+    qa = data.qa if isinstance(data.qa, dict) else {}
+    if qa.get("status") in ("passed", "failed", "blocked", "not_run"):
+        f.qa_status = qa["status"]  # the orchestrator saw the whole QA stage, not only the report
+    f.qa_reason = _text(qa.get("reason")) or f.qa_blocked_reason
     return f

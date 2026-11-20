@@ -33,7 +33,7 @@ A single-user web app to create, track, update and delete personal tasks with du
 ## Status
 
 - **Tests:** 8 of 8 passed.
-- **Repair attempts:** 0 of 2.
+- **Automatic repair:** not available in this version.
 - **Requirements:** 6 (6 must), 13 acceptance criteria.
 - **Open risks:** 3, see `risks.md`.
 

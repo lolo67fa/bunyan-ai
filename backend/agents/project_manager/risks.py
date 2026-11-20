@@ -63,11 +63,14 @@ def _tests(f: Facts) -> List[Draft]:
     out: List[Draft] = []
     if not f.has_test_report:
         if f.code_done and f.run_completed:
+            why = f" ({f.qa_reason})" if f.qa_reason else ""
+            blocked = f.qa_status == "blocked"
             out.append({
-                "title": _t(L, "التطبيق لم يُختبر", "The app was not tested"),
+                "title": _t(L, ("تعذّر تشغيل الاختبار" if blocked else "التطبيق لم يُختبر") + why,
+                            ("Tests could not run" if blocked else "The app was not tested") + why),
                 "likelihood": "high", "impact": "high",
                 "mitigation": _t(L, "شغّل فحوصات مختبر الجودة الثمانية قبل التسليم.", "Run the QA Tester's 8 checks before delivery."),
-                "source": "test_report.json missing",
+                "source": "orchestrator qa.status" if f.qa_status else "test_report.json missing",
             })
         return out
     if f.qa_blocked_reason:
@@ -79,23 +82,38 @@ def _tests(f: Facts) -> List[Draft]:
         })
     for c in f.failed_checks:
         name = check_name(c["id"], L)
-        exhausted = f.repair_attempt >= 2
+        message = (c.get("message") or "").strip().splitlines()[0][:200] if c.get("message") else ""
+        detail = f": {message}" if message else ""
+        if not f.repair_loop_available:
+            mitigation = _t(L, "لا يوجد إصلاح تلقائي في هذه النسخة: أصلح الخلل يدوياً حسب رسالة الخطأ، ثم أعد الفحوصات.",
+                            "There is no automatic repair in this version: fix it by hand from the error message, then run the checks again.")
+        elif f.repair_attempt >= 2:
+            mitigation = _t(L, "انتهت محاولتا الإصلاح: سلّم الكود مع تقرير العيوب وراجع الخلل يدوياً.",
+                            "Both repair attempts are used: deliver the code with the defect report and fix it by hand.")
+        else:
+            mitigation = _t(L, "أُرسل العيب للمطوّر لإصلاحه، ثم تُعاد الفحوصات الثمانية.",
+                            "The defect went back to the Developer; all 8 checks run again after the fix.")
         out.append({
-            "title": _t(L, f"فحص «{name}» ما زال يفشل", f"Check “{name}” still fails"),
+            "title": _t(L, f"فحص «{name}» يفشل{detail}", f"Check “{name}” fails{detail}"),
             "likelihood": "high", "impact": "high",
-            "mitigation": _t(L,
-                "انتهت محاولتا الإصلاح: سلّم الكود مع تقرير العيوب وراجع الخلل يدوياً." if exhausted else "أُرسل العيب للمطوّر لإصلاحه، ثم تُعاد الفحوصات الثمانية.",
-                "Both repair attempts are used: deliver the code with the defect report and fix it by hand." if exhausted else "The defect went back to the Developer; all 8 checks run again after the fix."),
+            "mitigation": mitigation,
             "source": f"test_report.checks.{c['id']}",
+        })
+    if f.checks_not_run and not f.qa_blocked_reason:
+        out.append({
+            "title": _t(L, f"لم يعمل {ar(f.checks_not_run, 'check')}", f"{f.checks_not_run} checks did not run"),
+            "likelihood": "high", "impact": "high",
+            "mitigation": _t(L, "هذا السلوك غير مؤكد: أعد تشغيل الفحوصات.", "This behaviour is not verified: run the checks again."),
+            "source": "test_report.summary.not_run",
         })
     if f.checks_skipped:
         out.append({
-            "title": _t(L, f"لم يعمل {ar(f.checks_skipped, 'check')}", f"{f.checks_skipped} checks did not run"),
-            "likelihood": "medium", "impact": "medium",
-            "mitigation": _t(L, "راجع سبب التخطي في تقرير الاختبار وأعد التشغيل.", "See why they were skipped in the test report and run again."),
+            "title": _t(L, f"{ar(f.checks_skipped, 'check')} لم تنطبق على هذا التطبيق", f"{f.checks_skipped} checks did not apply to this app"),
+            "likelihood": "low", "impact": "low",
+            "mitigation": _t(L, "تخطّاها مختبر الجودة لأنها لا تنطبق؛ لا تُحسب ناجحة.", "QA skipped them as not applicable; they are not counted as passed."),
             "source": "test_report.summary.skipped",
         })
-    if f.repair_attempt > 0 and f.all_passed:
+    if f.repair_loop_available and f.repair_attempt > 0 and f.all_passed:
         out.append({
             "title": _t(L, "فحص فشل في التشغيل الأول", "A check failed on the first run"),
             "likelihood": "low", "impact": "medium",

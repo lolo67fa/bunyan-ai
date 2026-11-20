@@ -92,15 +92,16 @@ def test_documents_for_a_passed_run(tmp_path):
     requirements = load_requirements("task_manager_en")
 
     text = plan(tmp_path)
-    assert text.startswith("# Project plan — Task Manager\n")
-    assert "- Test result: Passed: 8 of 8 checks passed" in text
-    assert f"- Run time: {project['metrics']['run_time_seconds']} seconds" in text
-    assert f"- Acceptance criteria: {len(requirements['acceptance_criteria'])}" in text
-    for name in ("requirements.json", "architecture.json", "index.html", "style.css", "app.js", "test_report.json"):
-        relative = f"app/{name}" if name in ("index.html", "style.css", "app.js") else name
-        assert f"| `{name}` | {(tmp_path / relative).stat().st_size} bytes |" in text  # real sizes on disk
-    assert "No open defects: QA reported 8 of 8 checks passed and none failed." in risks(tmp_path)
-    assert "Storage key `bunyan_task`" in risks(tmp_path)
+    assert text.startswith("# Project plan: Task Manager\n")
+    assert "Task Manager is complete and passed 8 of 8 checks" in text
+    assert "- **Tests:** 8 of 8 passed." in text
+    assert "| **Total** |" in text  # the measured run time
+    assert f"{len(requirements['acceptance_criteria'])} acceptance criteria" in text
+    assert "- **Automatic repair:** not available in this version." in text
+    for name in ("index.html", "style.css", "app.js", "test_report.json"):
+        assert f"`{name}`" in text
+    assert "Data is lost if the browser data is cleared" in risks(tmp_path)
+    assert "fails" not in risks(tmp_path)
 
 
 def test_documents_for_a_run_with_defects(tmp_path):
@@ -108,13 +109,12 @@ def test_documents_for_a_run_with_defects(tmp_path):
     project, _ = run(tmp_path, StandInRunner(report))
 
     assert project["status"] == "completed" and project["qa"]["status"] == "failed"
-    assert "- Test result: Defects found: 7 of 8 checks passed, 1 failed" in plan(tmp_path)
+    assert "1 of 8 checks still fails" in plan(tmp_path)
     text = risks(tmp_path)
-    assert "- `persist_after_refresh`" in text
-    assert "Open defect: check `persist_after_refresh` failed" in text
     assert "persist_after_refresh went wrong" in text  # the message from the QA report
-    assert "No repair was attempted: repair attempts 0 of 2." in text
-    assert "No open defects" not in text
+    assert "no automatic repair in this version" in text.lower()
+    for claim in ("went back to the Developer", "repair attempts are used", "fixed it in attempt"):
+        assert claim not in text and claim not in plan(tmp_path)  # no repair loop ran
 
 
 def test_documents_when_qa_is_switched_off(tmp_path):
@@ -122,19 +122,19 @@ def test_documents_when_qa_is_switched_off(tmp_path):
 
     assert project["status"] == "completed" and project["qa"]["status"] == "not_run"
     assert recorder.steps[-2:] == [("documenting", "project_manager"), ("completed", None)]
-    assert "- Test result: Not run: QA was switched off for this run" in plan(tmp_path)
-    assert "- Run time: Not available" in plan(tmp_path)
-    assert "The application was not tested" in risks(tmp_path)
-    assert "checks passed" not in plan(tmp_path) and "No open defects" not in risks(tmp_path)
+    assert "complete but was not tested" in plan(tmp_path)
+    assert "- **Tests:** not run (QA is switched off" in plan(tmp_path)
+    assert "stopped at" not in plan(tmp_path) and "checks passed" not in plan(tmp_path)
+    assert "The app was not tested (QA is switched off" in risks(tmp_path)
 
 
 def test_arabic_project_gets_arabic_documents(tmp_path):
     run(tmp_path, StandInRunner(report_in_saras_format(entity="Product")), requirements="scenario_b_inventory_ar")
 
-    assert plan(tmp_path).startswith("# خطة المشروع — ")
-    assert "- نتيجة الاختبار: ناجح: 8 من 8 فحوص ناجحة" in plan(tmp_path)
-    assert risks(tmp_path).startswith("# المخاطر — ")
-    assert "مفتاح التخزين `bunyan_product`" in risks(tmp_path)
+    assert plan(tmp_path).startswith("# خطة المشروع: ")
+    assert "نجح 8 من 8 فحوصات" in plan(tmp_path)
+    assert risks(tmp_path).startswith("# المخاطر: ")
+    assert "الإصلاح التلقائي:** غير متوفر في هذه النسخة" in plan(tmp_path)
 
 
 def test_documents_have_no_server_paths(tmp_path):
@@ -182,7 +182,7 @@ def test_pm_crash_fails_the_run_and_keeps_the_app(tmp_path, monkeypatch):
     def crash(*args, **kwargs):
         raise RuntimeError("template exploded")
 
-    monkeypatch.setattr(pipeline, "write_documents", crash)
+    monkeypatch.setattr(pipeline, "run_project_manager", crash)
     project, recorder = run(tmp_path, StandInRunner())
 
     assert_pm_failed_but_app_kept(project, recorder, tmp_path)
@@ -191,10 +191,10 @@ def test_pm_crash_fails_the_run_and_keeps_the_app(tmp_path, monkeypatch):
 
 
 def test_pm_that_writes_only_one_document_is_not_completed(tmp_path, monkeypatch):
-    def only_the_plan(requirements, architecture, output_dir, **kwargs):
-        (Path(output_dir) / "project_plan.md").write_text("# plan", encoding="utf-8")
+    def only_the_plan(result, out_dir):
+        (Path(out_dir) / "project_plan.md").write_text("# plan", encoding="utf-8")
 
-    monkeypatch.setattr(pipeline, "write_documents", only_the_plan)
+    monkeypatch.setattr(pipeline, "write_outputs", only_the_plan)
     project, recorder = run(tmp_path, StandInRunner())
 
     assert_pm_failed_but_app_kept(project, recorder, tmp_path)
@@ -212,24 +212,31 @@ def test_pm_file_error_fails_the_run_without_a_server_path(tmp_path):
 
 
 def test_pm_refusing_its_inputs_fails_the_run(tmp_path, monkeypatch):
-    real_build = pipeline.build_architecture
+    real = pipeline.run_project_manager
 
-    def architecture_without_entity(requirements):
-        architecture = real_build(requirements)
-        monkeypatch.setattr(pipeline, "generate", lambda r, a, out: _write_app(out))
-        architecture.pop("entity")
-        return architecture
+    def without_app(data, **kwargs):
+        return real({**data, "requirements": {"entities": []}}, **kwargs)  # PMInput needs app and entities
 
-    def _write_app(out):
-        out.mkdir(parents=True, exist_ok=True)
-        for name in ("index.html", "style.css", "app.js"):
-            (out / name).write_text("x", encoding="utf-8")
-
-    monkeypatch.setattr(pipeline, "build_architecture", architecture_without_entity)
+    monkeypatch.setattr(pipeline, "run_project_manager", without_app)
     project, _ = run(tmp_path, StandInRunner())
 
     assert project["error"]["code"] == "documentation_failed"
-    assert "entity" in project["error"]["message"]
+    assert "app" in project["error"]["message"]
+
+
+def test_the_pipeline_never_asks_the_pm_for_a_paid_call(tmp_path, monkeypatch):
+    monkeypatch.setenv("PM_MODE", "llm")  # even if someone sets it on the server
+    seen = {}
+    real = pipeline.run_project_manager
+
+    def spy(data, **kwargs):
+        seen.update(kwargs, repair_loop_available=data["repair_loop_available"], qa=data["qa"])
+        return real(data, **kwargs)
+
+    monkeypatch.setattr(pipeline, "run_project_manager", spy)
+    project, _ = run(tmp_path, StandInRunner())
+    assert project["status"] == "completed"
+    assert seen["mode"] == "rules" and seen["repair_loop_available"] is False and seen["qa"]["status"] == "passed"
 
 
 # ---------- API: artifacts, ZIP, restart ----------
@@ -259,7 +266,7 @@ def test_api_serves_both_documents_and_zip_has_eight_files(client, monkeypatch, 
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/markdown; charset=utf-8"
         assert response.content == (storage.project_dir(pid) / name).read_bytes()
-    assert "Passed: 8 of 8 checks passed" in client.get(f"/projects/{pid}/artifacts/project_plan.md").text
+    assert "- **Tests:** 8 of 8 passed." in client.get(f"/projects/{pid}/artifacts/project_plan.md").text
 
     archive = zipfile.ZipFile(io.BytesIO(client.get(f"/projects/{pid}/download").content))
     assert archive.testzip() is None
@@ -270,7 +277,7 @@ def test_api_serves_both_documents_and_zip_has_eight_files(client, monkeypatch, 
 
 def test_api_pm_failure_keeps_app_previewable_and_downloadable(client, monkeypatch, qa_on):
     monkeypatch.setattr(pipeline, "run_qa", StandInRunner())
-    monkeypatch.setattr(pipeline, "write_documents", lambda *a, **k: (_ for _ in ()).throw(OSError(28, "No space left on device")))
+    monkeypatch.setattr(pipeline, "write_outputs", lambda *a, **k: (_ for _ in ()).throw(OSError(28, "No space left on device")))
     pid = approve(client)
 
     project = client.get(f"/projects/{pid}").json()

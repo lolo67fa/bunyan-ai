@@ -59,10 +59,12 @@ def build_stages(f: Facts) -> List[Stage]:
     if f.has_test_report:
         if f.all_passed:
             tests_status = "done"
-        elif f.repair_attempt >= 2 or f.qa_blocked_reason:
-            tests_status = "failed"
+        elif f.qa_blocked_reason or f.checks_not_run or not f.repair_loop_available or f.repair_attempt >= 2:
+            tests_status = "failed"  # no repair is coming: the stage ended with defects or could not test
         else:
             tests_status = "in_progress"
+    elif f.qa_status == "blocked":
+        tests_status = "failed"
     done = {
         "requirements": "done" if req_done else "not_started",
         "structure": "done" if f.has_architecture else "not_started",
@@ -73,6 +75,8 @@ def build_stages(f: Facts) -> List[Stage]:
     # The first unfinished stage is either running or where the run stopped.
     order = ["requirements", "structure", "development", "tests"]
     for key in order:
+        if key == "tests" and f.qa_status == "not_run":
+            break  # QA was switched off on purpose: the stage did not run, it is not running now
         if done[key] == "not_started":
             done[key] = "failed" if f.workflow_status in ("failed", "rejected") else "in_progress"
             break
@@ -86,8 +90,11 @@ def build_stages(f: Facts) -> List[Stage]:
                         f"Data model, screens and validation ({entity_word}, {screens} screens)"),
         "development": " · ".join(f.generated_files or CODE_FILES),
         "tests": (_t(L, f"نجح {f.checks_passed} من {ar(f.checks_total, 'check')}", f"{f.checks_passed} of {f.checks_total} checks passed")
-                  + (_t(L, f" بعد {ar(f.repair_attempt, 'repair')}", f" after {f.repair_attempt} repair{'s' if f.repair_attempt > 1 else ''}") if f.repair_attempt else ""))
-                 if f.has_test_report else _t(L, "8 فحوصات في متصفح حقيقي", "8 checks in a real browser"),
+                  + (_t(L, f" بعد {ar(f.repair_attempt, 'repair')}", f" after {f.repair_attempt} repair{'s' if f.repair_attempt > 1 else ''}")
+                     if f.repair_attempt and f.repair_loop_available else ""))
+                 if f.has_test_report else
+                 _t(L, "لم يُشغَّل" + (f" ({f.qa_reason})" if f.qa_reason else ""), "Not run" + (f" ({f.qa_reason})" if f.qa_reason else ""))
+                 if f.qa_status in ("not_run", "blocked") else _t(L, "8 فحوصات في متصفح حقيقي", "8 checks in a real browser"),
         "documentation": "project_plan.md · risks.md",
     }
     owners = {
@@ -108,9 +115,11 @@ def rules_summary(f: Facts, stages: List[Stage], risks: List[Risk]) -> str:
     if finished and f.all_passed:
         head = _t(L, f"اكتمل {f.app_name} واجتاز {f.checks_passed} من {ar(f.checks_total, 'check')}",
                   f"{f.app_name} is complete and passed {f.checks_passed} of {f.checks_total} checks")
-        if f.repair_attempt:
+        if f.repair_attempt and f.repair_loop_available:
             head += _t(L, f" بعد {ar(f.repair_attempt, 'repair')}", f" after {f.repair_attempt} repair{'s' if f.repair_attempt > 1 else ''}")
-    elif f.has_test_report and not f.all_passed:
+    elif f.qa_status == "not_run" and all(s.status == "done" for s in stages if s.key != "tests"):
+        head = _t(L, f"اكتمل {f.app_name} لكنه لم يُختبر", f"{f.app_name} is complete but was not tested")
+    elif f.has_test_report and f.checks_failed:
         head = _t(L, f"اكتمل الكود لكن {f.checks_failed} من {ar(f.checks_total, 'check')} ما زالت تفشل",
                   f"The code is done but {f.checks_failed} of {f.checks_total} checks still {'fails' if f.checks_failed == 1 else 'fail'}")
     else:
@@ -149,12 +158,12 @@ def plan_markdown(f: Facts, stages: List[Stage], risks: List[Risk], summary: str
 
     # Timeline
     lines += [f"## {_t(L, 'الجدول الزمني', 'Timeline')}", ""]
-    if any(s.seconds is not None for s in stages) or f.run_time_seconds:
+    if any(s.seconds is not None for s in stages) or f.run_time_seconds is not None:
         lines += [_t(L, "| المرحلة | المدة |", "| Stage | Duration |"), "|---|---|"]
         for s in stages:
             if s.seconds is not None:
                 lines.append(f"| {_w(STAGE_NAME[s.key], L)} | {_duration(s.seconds, L)} |")
-        if f.run_time_seconds:
+        if f.run_time_seconds is not None:
             within = f.run_time_seconds <= RUN_TIME_TARGET_SECONDS
             lines.append(_t(L,
                 f"| **المجموع** | **{_duration(f.run_time_seconds, L)}** ({'ضمن' if within else 'فوق'} الهدف: {ar(RUN_TIME_TARGET_SECONDS, 'second')}) |",
@@ -169,7 +178,13 @@ def plan_markdown(f: Facts, stages: List[Stage], risks: List[Risk], summary: str
     lines += [f"## {_t(L, 'حالة المشروع', 'Status')}", ""]
     if f.has_test_report:
         lines.append(_t(L, f"- **الاختبار:** نجح {f.checks_passed} من {ar(f.checks_total, 'check')}.", f"- **Tests:** {f.checks_passed} of {f.checks_total} passed."))
-    lines.append(_t(L, f"- **محاولات الإصلاح:** {f.repair_attempt} من 2.", f"- **Repair attempts:** {f.repair_attempt} of 2."))
+    elif f.qa_status in ("not_run", "blocked"):
+        lines.append(_t(L, "- **الاختبار:** لم يُشغَّل" + (f" ({f.qa_reason})." if f.qa_reason else "."),
+                        "- **Tests:** not run" + (f" ({f.qa_reason})." if f.qa_reason else ".")))
+    if f.repair_loop_available:
+        lines.append(_t(L, f"- **محاولات الإصلاح:** {f.repair_attempt} من 2.", f"- **Repair attempts:** {f.repair_attempt} of 2."))
+    else:
+        lines.append(_t(L, "- **الإصلاح التلقائي:** غير متوفر في هذه النسخة.", "- **Automatic repair:** not available in this version."))
     lines.append(_t(L, f"- **المتطلبات:** {ar(f.requirement_count, 'requirement')} (منها {f.must_count} إلزامية)، و{ar(f.criteria_count, 'criterion')}.",
                     f"- **Requirements:** {f.requirement_count} ({f.must_count} must), {f.criteria_count} acceptance criteria."))
     lines.append(_t(L, f"- **المخاطر المفتوحة:** {len(open_risks)}، تفاصيلها في `risks.md`.",
