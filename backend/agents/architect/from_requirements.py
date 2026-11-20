@@ -193,6 +193,58 @@ def _label_in(text: str, fields: List[Dict[str, Any]]) -> Optional[Dict[str, Any
     return max(hits, key=lambda f: len(f["label"])) if hits else None
 
 
+_FIELD_WORD = re.compile(r"(?:\bfields?\b|الحقول|حقول|الحقل|حقل)\s*[:：]?\s*", re.IGNORECASE)
+
+
+def _fields_named(text: str, fields: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Fields the text names explicitly: a quoted label, a label right after the word field/حقل
+    ("بجانب حقل الكمية", "the fields: Title, Priority"), or "the Title field". A label that is
+    merely mentioned in a sentence still does not count (see _label_in)."""
+    by_label = {f["label"]: f for f in fields}
+    named = {f["label"] for f in fields if f["label"] in set(re.findall(_QUOTE, text))}
+    for m in _FIELD_WORD.finditer(text):
+        # a list after the word: take items while each one is exactly a label
+        for item in re.split(r"\s*[,،]\s*|\s+(?:and|or)\s+", text[m.end():]):
+            item = item.strip(" .؛;:\"“”«»")
+            if item not in by_label and item.startswith("و") and item[1:] in by_label:
+                item = item[1:]
+            if item not in by_label:
+                break
+            named.add(item)
+    for label in by_label:
+        if re.search(re.escape(label) + r"\s+field\b", text, re.IGNORECASE):
+            named.add(label)
+    return [f for f in fields if f["label"] in named]
+
+
+def _numbers(text: str) -> List[float]:
+    return [float(n) for n in re.findall(r"-?\d+(?:\.\d+)?", text)]
+
+
+_WHOLE_NUMBER = re.compile(r"whole number|integer|عدد(?:اً|ا)? صحيح|رقم(?:اً|ا)? صحيح", re.IGNORECASE)
+
+
+def _validation_rules(when: str, message: str, field: Dict[str, Any]) -> List[str]:
+    """Which rule(s) a validation AC exercises: from the 'when' text, or from the bounds the message names."""
+    rules = list(field["messages"].keys())
+    if _EMPTY_WORDS.search(when) and "required" in rules:
+        return ["required"]
+    if field["type"] in NUMBER_TYPES and _WHOLE_NUMBER.search(message):
+        return []  # the whole-number check has no message slot in the contract; reported by the caller
+    others = [r for r in rules if r != "required"]
+    if len(others) == 1:
+        return others
+    v = field["validation"]
+    bounds = [r for r in ("min_length", "max_length", "min_value", "max_value") if r in v]
+    # one message for a range: "must be 2 to 100 characters" names both bounds -> both rules
+    in_message = set(_numbers(message))
+    named = [r for r in bounds if float(v[r]) in in_message]
+    if named:
+        return named
+    rule = _validation_rule(when, field)
+    return [rule] if rule else []
+
+
 def _validation_rule(when: str, field: Dict[str, Any]) -> Optional[str]:
     """Which rule a validation AC exercises, from its 'when' text."""
     rules = list(field["messages"].keys())
@@ -278,11 +330,22 @@ def _apply_acceptance_criteria(req: Dict[str, Any], doc: Dict[str, Any], warning
             put("messages.confirm_delete", text, ac_id)
         elif cat == "validation":
             rest = re.sub(r"[\"“«]" + re.escape(text) + r"[\"”»]", " ", then)
-            field = _label_in(rest, fields) or _label_in(when, fields)
-            rule = _validation_rule(when, field) if field else None
-            if field and rule:
+            named = _fields_named(rest, fields) or _fields_named(when, fields)
+            if len(named) > 1 and _EMPTY_WORDS.search(when) and all("required" in f["messages"] for f in named):
+                for f in named:  # "the message 'This field is required' next to each of: A, B, C"
+                    put(f"entity.fields.{f['name']}.messages.required", text, ac_id)
+                continue
+            field = max(named, key=lambda f: len(f["label"])) if named else None
+            rules = _validation_rules(when, text, field) if field else []
+            for rule in rules:
                 put(f"entity.fields.{field['name']}.messages.{rule}", text, ac_id)
-            else:
+            if field and not rules and field["type"] in NUMBER_TYPES and _WHOLE_NUMBER.search(text):
+                warnings.append(
+                    f"{ac_id} quotes the message “{text}” for the whole-number check of '{field['name']}', but the "
+                    "architecture contract has no message slot for that check (fields[].messages has no 'invalid'); "
+                    "the form still refuses the value, with the template's generic number error"
+                )
+            elif not rules:
                 warnings.append(
                     f"{ac_id} quotes the message “{text}” but it is not tied to one field rule (likely a business "
                     "rule such as no double booking); the MVP template cannot show it"

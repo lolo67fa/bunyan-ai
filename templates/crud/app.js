@@ -92,12 +92,12 @@ const CONFIG = __BUNYAN_CONFIG__;
       else if(v.max_length!=null&&str.length>v.max_length)errors[f.name]=m.max_length||'Too long';
       else if(v.pattern){try{if(!new RegExp(v.pattern).test(str))errors[f.name]=m.pattern||'Invalid format';}catch{errors[f.name]=m.pattern||'Invalid format';}}
       if(!errors[f.name]&&(f.type==='integer'||f.type==='decimal')){
-        if(!Number.isFinite(value)||(f.type==='integer'&&!Number.isInteger(value)))errors[f.name]=m.invalid||'Invalid number';
+        if(!Number.isFinite(value)||(f.type==='integer'&&!Number.isInteger(value)))errors[f.name]=m.invalid||messages.invalid||'Invalid number';
         else if(v.min_value!=null&&value<v.min_value)errors[f.name]=m.min_value||'Below minimum';
         else if(v.max_value!=null&&value>v.max_value)errors[f.name]=m.max_value||'Above maximum';
       }
       if(!errors[f.name]&&v.date_constraint){const date=str.slice(0,10);if(v.date_constraint==='not_in_past'&&date<today())errors[f.name]=m.date_constraint||'Date cannot be in the past';if(v.date_constraint==='not_in_future'&&date>today())errors[f.name]=m.date_constraint||'Date cannot be in the future';}
-      if(!errors[f.name]&&f.type==='enum'&&!(f.options||[]).some(o=>o.value===value))errors[f.name]=m.invalid||'Invalid selection';
+      if(!errors[f.name]&&f.type==='enum'&&!(f.options||[]).some(o=>o.value===value))errors[f.name]=m.invalid||messages.invalid||'Invalid selection';
       if(!errors[f.name]&&f.unique&&existing.some(r=>r.id!==editingId&&String(r[f.name])===str))errors[f.name]=m.unique||'Already exists';
     }
     return errors;
