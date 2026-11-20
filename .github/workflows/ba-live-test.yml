@@ -41,6 +41,8 @@ jobs:
       BA_MAX_RETRIES: "0"      # no second attempt when the answer fails validation
       BA_FALLBACKS: "off"      # no server-side fallback to another model on refusal
       BA_SDK_MAX_RETRIES: "0"  # no SDK transport retries on 429/5xx
+      BA_MAX_TOKENS: "32000"   # output cap: the most this one call can cost is about $0.67 on claude-opus-5-5
+      BA_REQUEST_TIMEOUT: "600"  # seconds; the job itself stops at 20 minutes
       BA_VERBOSE: "false"
       PYTHONIOENCODING: utf-8
     steps:
