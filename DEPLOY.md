@@ -45,6 +45,9 @@ browser ──HTTPS──► platform edge (TLS) ──► container :$PORT
   unlimited projects. A whole club on one Wi-Fi shares one address: size the per-address limits for it.
 - Writes from another site are refused (Origin check, plus SameSite).
 - Guest mode refuses to start unless `BA_MODE=mock`: anonymous visitors never cause paid requests.
+- The public site (the React app and its files) always loads: only the API (`/projects…`) needs a
+  new guest identity, so a busy shared Wi-Fi never locks people out of the homepage. Errors opened in a
+  browser are a small Arabic page in the Riyadh theme; API errors are JSON with `charset=utf-8`.
 - Rollback: set `BUNYAN_AUTH=required` again (the `BUNYAN_USERS` logins still work).
 
 ## Run locally (Docker Compose)
@@ -63,14 +66,16 @@ Data stays in the `bunyan-data` volume across `docker compose restart` and `down
 
 ## Deploy on Railway
 
-1. Create a project from this GitHub repository and choose the branch `deploy/club-demo`.
-   Railway builds the `Dockerfile` (see `railway.json`, health check `/health`).
+1. Create a project and a service. The live demo is deployed by upload from a checkout of
+   `deploy/club-demo` (`railway up --detach`); it is not linked to GitHub, so pushing a branch never
+   changes the live site. Railway builds the `Dockerfile` (see `railway.json`, health check `/health`).
 2. Add a volume to the service, mounted at `/data`.
 3. Service variables: everything from `deploy.env.example` with real values. Put
    `BUNYAN_USERS` and, for real analysis, `ANTHROPIC_API_KEY` as variables there (never in git).
 4. Settings, Networking: generate a public domain (`https://<name>.up.railway.app`).
-5. Check: `curl https://<name>.up.railway.app/health` returns `{"status":"ok"}` and the
-   site asks for a login.
+5. Check: `curl https://<name>.up.railway.app/health` returns `{"status":"ok"}`; in guest mode the
+   homepage opens without a login, with `BUNYAN_AUTH=required` it asks for one.
+6. Rollback: Deployments → redeploy an earlier successful deployment (volume and variables stay).
 
 Size the service at 2 GB RAM (Chromium for QA plus the backend). Hobby plan: $5/month
 including $5 of usage; usage is about $10 per GB of RAM and $20 per vCPU per month.
@@ -84,10 +89,13 @@ token usage for each paid request. With `BA_MODE=mock` no request reaches Anthro
 
 ## Tester instructions
 
-1. Open the address you were given and sign in with your user name and password.
-2. "مشروع جديد": describe a simple app that manages one kind of record (tasks, products,
-   appointments…), in Arabic or English.
-3. Review the requirements. Use "طلب تعديل" to ask for a change, or approve.
-4. Wait for the five agents. Then open the preview, the test report, the plan, and
+Guest mode (the live demo): open the address; no login. Arabic guide: [docs/user-guide-ar.md](docs/user-guide-ar.md).
+
+1. "مشروع جديد": describe a simple app that manages one kind of record (tasks, products,
+   appointments…), in Arabic or English, or pick an example.
+2. Review the requirements. Use "طلب تعديل" to ask for a change, or approve.
+3. Wait for the five agents. Then open the preview, the test report, the plan, and
    download the ZIP (open `index.html` from it on your computer).
-5. Limits: a few projects per person per day. Please do not enter personal data.
+4. Limits: a few projects per person per day. Please do not enter personal data.
+
+With `BUNYAN_AUTH=required`, testers sign in with the user name and password they were given.

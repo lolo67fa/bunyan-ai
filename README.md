@@ -4,12 +4,20 @@
 
 **Tuwaiq Club — King Saud University**
 
-> **Status:** Initial development stage (Week 3 of 4). The repository currently contains the project structure and documentation. Implementation will be added by each team member on their feature branch.
+> **Status (November 20, 2026): delivered MVP.** All five agents, the orchestrator, the Riyadh-themed React
+> platform and a Docker/Railway deployment are implemented and tested.
+>
+> **Live demo:** https://bunyan-production-dfa4e72b.up.railway.app (guest access, no login; mock Business Analyst)
+>
+> Submission package: [docs/SUBMISSION.md](docs/SUBMISSION.md) (what is live, what is only in branches,
+> real-LLM evidence, test results, limitations, team contributions, rollback). Arabic user guide:
+> [docs/user-guide-ar.md](docs/user-guide-ar.md). Deployment and security: [DEPLOY.md](DEPLOY.md).
 
 ---
 
 ## Table of Contents
 
+- [Delivery Status](#delivery-status)
 - [Introduction](#introduction)
 - [Problem Statement](#problem-statement)
 - [Proposed Solution](#proposed-solution)
@@ -27,6 +35,19 @@
 - [Security and Limitations](#security-and-limitations)
 - [Future Enhancements](#future-enhancements)
 - [Additional Documentation](#additional-documentation)
+
+---
+
+## Delivery Status
+
+| Area | State |
+|---|---|
+| Five agents + orchestrator | Implemented: Business Analyst → user approval → Architect → Developer → QA (real Playwright, Chromium) → Project Manager → preview and ZIP. |
+| Business Analyst | Two modes. `mock`: deterministic, recognises only the predefined example ideas (task manager, inventory, appointments/bookings…). `llm`: Claude (`claude-opus-5-5`) through the Anthropic SDK, verified with real paid runs (see [docs/SUBMISSION.md](docs/SUBMISSION.md#real-llm-evidence)). The public demo runs `mock`. |
+| Architect, Developer, QA, Project Manager | Deterministic (no LLM): rules, a fixed CRUD template and a fixed 8-check Playwright suite. The PM runs in `mode="rules"`. |
+| Automatic repair loop (QA → Developer) | **Not part of this delivery.** Failed checks are reported honestly in `test_report.json` and `risks.md`; nothing claims a repair happened. |
+| Platform | React (Vite) with the Riyadh theme (light/dark, RTL/LTR, desktop/mobile), FastAPI backend. |
+| Deployment | One Docker image; live on Railway in guest mode with signed sessions, per-owner isolation, quotas and a sandboxed preview. |
 
 ---
 
@@ -69,7 +90,7 @@ Key characteristics of the solution:
 - **Structured workflow.** Agents follow a fixed sequence that mirrors a real development lifecycle: analysis → design → implementation → testing → project management.
 - **Human in the loop.** The user reviews and approves the generated requirements before any design or code is produced.
 - **Shared JSON contracts.** Agents communicate through agreed-upon JSON schemas, making outputs predictable and testable.
-- **Automated quality assurance.** Generated applications are tested in a real browser with Playwright, and failures are sent back to the Developer Agent for correction (up to two repair attempts).
+- **Automated quality assurance.** Generated applications are tested in a real browser with Playwright; the actual results, including failures, are reported to the user and the Project Manager. (An automatic QA → Developer repair loop was planned; it is not part of this delivery.)
 - **Complete deliverables.** Alongside the code, the user receives requirements, architecture, test results, a project plan, and a risk report.
 - **Focused scope.** The MVP targets CRUD web applications only, which keeps generation reliable and results verifiable.
 
@@ -83,7 +104,7 @@ By the end of the four-week MVP, the team aims to:
 2. **Produce structured requirements** (`requirements.json`) containing entities, attributes, functional requirements, user stories, and acceptance criteria.
 3. **Produce an architecture specification** (`architecture.json`) describing screens, components, data schema, and navigation.
 4. **Run automated functional tests** with Playwright against every generated application and produce an actual test report (`test_report.json`).
-5. **Automatically attempt to repair failed tests**, with a maximum of two Developer–QA repair iterations.
+5. ~~Automatically attempt to repair failed tests~~ — planned, **not delivered**: failures are reported, not repaired.
 6. **Generate project documentation** — a project plan (`project_plan.md`) and a risk report (`risks.md`).
 7. **Provide a live preview and a downloadable package** of the generated application and all artifacts.
 8. **Demonstrate successful generation across several different CRUD scenarios** (for example: task manager, appointment booking, inventory tracker, order manager) during final evaluation.
@@ -154,9 +175,9 @@ Software Architect Agent ──► architecture.json
    │
    ▼
 Developer Agent ──► index.html, style.css, app.js
-   │        ▲
-   ▼        │  defect feedback (max 2 repair attempts)
-QA Tester Agent ──► test_report.json
+   │
+   ▼
+QA Tester Agent ──► test_report.json   (real Chromium, 8 fixed checks)
    │
    ▼
 Project Manager Agent ──► project_plan.md, risks.md
@@ -202,7 +223,7 @@ Preview & Download
 - Implements Create, Read, Update, and Delete operations.
 - Implements input validation.
 - Implements localStorage persistence.
-- Fixes defects based on QA feedback.
+- (Fixing defects from QA feedback is future work; see the repair-loop note below.)
 
 #### 4. QA Tester Agent
 
@@ -211,7 +232,7 @@ Preview & Download
 - Verifies all four CRUD operations.
 - Identifies functional defects.
 - Produces actual test results and failure reports.
-- Sends relevant feedback to the Developer Agent.
+- Records each failed check with its real error message for the Project Manager and the user.
 
 #### 5. Project Manager Agent
 
@@ -221,21 +242,16 @@ Preview & Download
 - Identifies risks and issues.
 - Summarizes project status and deliverables.
 
-### Error-Correction Loop (QA ↔ Developer)
+### Error-Correction Loop (QA ↔ Developer): not delivered
 
-When the QA Tester Agent detects failing tests:
-
-1. The QA Tester produces a failure report describing the failing tests and observed behavior.
-2. The relevant feedback is sent to the Developer Agent.
-3. The Developer Agent revises the code and the QA Tester re-runs the tests.
-4. This loop runs a **maximum of two repair attempts**.
-5. If tests still fail after two attempts, the workflow continues, and the remaining failures are recorded in `test_report.json` and reflected in the Project Manager's risk report. The user always sees the actual test results.
-
-This limit keeps generation time and API usage bounded and prevents endless repair cycles.
+The original plan included a capped (two-attempt) repair loop. **It is not implemented in the delivered
+pipeline.** When a check fails, the run ends with the real result: `test_report.json` keeps the failing
+check and its message, the Project Manager lists it as an open risk ("no automatic repair in this
+version"), and the user sees the actual numbers. No document claims a repair that did not happen.
 
 ### Orchestration
 
-The five agents are coordinated by a **CrewAI**-based orchestrator exposed through a **FastAPI** backend. The orchestrator maintains the workflow state, passes artifacts between agents, pauses for user approval, and makes the results available to the React frontend. See [docs/architecture.md](docs/architecture.md) for details.
+The five agents are coordinated by a Python orchestrator (`backend/orchestrator/pipeline.py`) behind the **FastAPI** backend. It keeps the workflow state (`analyzing → awaiting_approval` or `awaiting_clarification` or `rejected`, then after approval `designing → developing → testing → documenting → completed`, or `failed` with an honest reason), passes the JSON contracts between agents, pauses for user approval and stores every artifact. The Business Analyst's LLM mode supports two backends: CrewAI (`BA_LLM_BACKEND=crewai`) and the Anthropic SDK directly (`BA_LLM_BACKEND=direct`), which is what the Docker image and the verified paid runs use. See [docs/architecture.md](docs/architecture.md) and [docs/SUBMISSION.md](docs/SUBMISSION.md).
 
 ---
 
@@ -245,8 +261,9 @@ The five agents are coordinated by a **CrewAI**-based orchestrator exposed throu
 |---|---|---|
 | Frontend | **React** | User interface for entering ideas, approving requirements, tracking progress, previewing, and downloading results. |
 | Backend | **Python + FastAPI** | REST API that receives requests, runs the agent workflow, and serves artifacts. |
-| Multi-agent framework | **CrewAI** | Defines the five agents and their tasks, and orchestrates the sequential workflow. |
-| Language model | **GPT or Claude (via API)** | Pretrained large language model powering each agent's reasoning and generation. |
+| Orchestration | **Python pipeline** (CrewAI optional for the BA) | Runs the five agents in order and records the state. |
+| Language model | **Claude `claude-opus-5-5`** (Anthropic API) | Used by the Business Analyst in `llm` mode only. The other four agents are deterministic. |
+| Deployment | **Docker**, **Railway** | One image with the frontend, backend, Node.js and Chromium. |
 | Generated applications | **HTML, CSS, JavaScript** | The output web applications, built from a reusable CRUD template. |
 | Generated app storage | **localStorage** | Client-side persistence for generated applications — no server or database required. |
 | Testing | **Playwright** | Automated browser testing of generated applications and end-to-end testing of the platform. |
@@ -303,7 +320,7 @@ bunyan-ai/
 | `backend/` | FastAPI application, API endpoints, configuration. | Alanoud |
 | `backend/agents/` | Definitions, prompts, and tasks for the five agents (one module per agent). | Each agent's owner |
 | `backend/schemas/` | Shared JSON schemas: `requirements`, `architecture`, `test_report`, etc. | Agreed by the whole team |
-| `backend/orchestrator/` | CrewAI crew, workflow state, QA–Developer repair loop. | Alanoud |
+| `backend/orchestrator/` | Pipeline, workflow state, agent hand-offs. | Alanoud, Ghala (integration) |
 | `templates/crud/` | The reusable HTML/CSS/JS CRUD template used by the Developer Agent. | Yara |
 | `tests/e2e/` | Playwright tests for generated apps and for the platform. | Sara |
 | `docs/` | Architecture, roles, plan, and collaboration guides. | Ghala (coordination), all members |
@@ -364,22 +381,30 @@ Detailed responsibilities and ownership boundaries: [docs/team-roles.md](docs/te
 
 ## Getting Started
 
-> **The repository is in its initial development stage.** Dependencies, build tooling, and run scripts have **not** been configured yet. Setup instructions will be completed as implementation progresses, and each component's README will document its own setup once its owner adds it.
+**With Docker (recommended for reviewers):**
 
-For now, team members can:
+```bash
+git clone https://github.com/lolo67fa/bunyan-ai.git && cd bunyan-ai
+cp deploy.env.example deploy.env          # BUNYAN_AUTH=guest and BA_MODE=mock work without any key
+# set BUNYAN_SESSION_SECRET in deploy.env to a long random value, e.g. from: openssl rand -hex 32
+docker compose up --build -d              # then open http://localhost:8080
+```
 
-1. Clone the repository:
+For plain `http://localhost` also set `BUNYAN_COOKIE_SECURE=false` in `deploy.env`. Details, security
+controls and Railway: [DEPLOY.md](DEPLOY.md).
 
-   ```bash
-   git clone https://github.com/lolo67fa/bunyan-ai.git
-   cd bunyan-ai
-   ```
+**For development (Python 3.11, Node.js 22):**
 
-2. Read this README and the documents in [`docs/`](docs/).
-3. Create a feature branch following the [GitHub workflow guide](docs/github-workflow.md).
-4. Copy `.env.example` to `.env` locally when the backend requires it, and fill in your own API keys. **Never commit `.env`.**
+```bash
+python -m venv .venv && . .venv/bin/activate
+pip install fastapi uvicorn httpx pytest -r backend/agents/business_analyst/requirements-direct.txt
+(cd tests/e2e && npm ci && npx playwright install chromium)   # the QA agent's browser tests
+uvicorn backend.main:app --reload --port 8000                  # BA_MODE=mock by default
+(cd frontend && npm ci && npm run dev)                         # http://localhost:5173
+```
 
-Planned prerequisites (to be confirmed by component owners): Python 3 for the backend, Node.js for the React frontend and Playwright, and an API key for the selected LLM provider.
+Tests: `pytest tests backend/agents`, `cd frontend && npm test`. The real Business Analyst needs
+`BA_MODE=llm` and `ANTHROPIC_API_KEY` (never commit `.env`).
 
 ---
 
@@ -471,7 +496,8 @@ Results will be recorded with the actual values measured during Week 4 evaluatio
 - **API key management.** API keys are provided through environment variables (`.env`), which is excluded from Git. Only variable names are listed in `.env.example`. Keys must never be committed, shared in issues, or exposed to the frontend.
 - **Isolated execution of AI-generated code.** Generated applications are untrusted code. They are previewed in a sandboxed environment (e.g., a sandboxed iframe) and tested in isolated Playwright browser contexts, never executed with backend privileges.
 - **Synthetic test data.** Testing uses synthetic data only; no real personal or business data is used.
-- **Limited automatic repair.** The QA–Developer repair loop is capped at two attempts to bound cost, time, and unexpected behavior.
+- **No automatic repair.** The planned QA–Developer repair loop is not part of this delivery; failures are reported as they are.
+- **Shared demo controls.** The public demo uses signed anonymous guest sessions, per-owner project isolation, Origin checks, per-guest/per-address/site-wide quotas, a sandboxed preview (CSP `sandbox`) and no paid LLM access. See [DEPLOY.md](DEPLOY.md).
 - **LLM output variability.** Language-model output is non-deterministic; results may vary between runs, and generated code should be reviewed before any reuse.
 - **Not for production.** BUNYAN AI is an academic prototype. Neither the platform nor the generated applications are intended for production deployment.
 
@@ -491,6 +517,9 @@ Results will be recorded with the actual values measured during Week 4 evaluatio
 
 ## Additional Documentation
 
+- [Submission package](docs/SUBMISSION.md)
+- [Arabic user guide](docs/user-guide-ar.md)
+- [Deployment and security](DEPLOY.md)
 - [System Architecture](docs/architecture.md)
 - [Team Roles and Ownership](docs/team-roles.md)
 - [Four-Week Development Plan](docs/development-plan.md)
