@@ -1,5 +1,7 @@
+import logging
 import os
 import threading
+import time
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -11,8 +13,21 @@ from fastapi.responses import RedirectResponse, Response
 from backend.schemas.contracts import ProjectRequest, ApprovalRequest, AnswersRequest
 from backend.storage import save_project, load_project, project_dir, list_project_ids
 from backend import artifacts
+from backend.agents.architect import ArchitectureError, build_architecture
 from backend.agents.business_analyst.analyst import analyze
+from backend.agents.business_analyst.config import ConfigError, get_settings as get_ba_settings
+from backend.agents.business_analyst.errors import describe_failure
+from backend.agents.business_analyst.revision import summarize_revision
 from backend.orchestrator import run_pipeline
+
+logger = logging.getLogger("uvicorn.error").getChild("bunyan.analysis")
+
+# Workflow status for each Business Analyst verdict.
+STATUS_FOR_VERDICT = {
+    "ready_for_review": "awaiting_approval",
+    "needs_clarification": "awaiting_clarification",
+    "rejected_out_of_scope": "rejected",
+}
 
 # Statuses in which the generation pipeline is working on a project.
 PIPELINE_STATES = ("designing", "developing", "testing", "documenting")
@@ -36,8 +51,31 @@ _running_lock = threading.Lock()
 _running_projects = set()
 
 
+def check_ba_configuration():
+    """Validate the Business Analyst settings once at startup.
+
+    BA_MODE=mock (default) or llm. A value the agent does not accept (BA_MODE,
+    BA_LLM_BACKEND, BA_EFFORT, ...) stops the server with a ConfigError that names it.
+    LLM mode without a model or key is logged here; each analysis then fails with
+    "ba_not_configured". There is never a silent fallback to mock.
+    """
+    settings = get_ba_settings()
+    if settings.mode == "llm":
+        try:
+            settings.check_llm_ready()
+        except ConfigError as exc:
+            logger.error("Business Analyst: BA_MODE=llm but the LLM is not configured: %s", exc)
+        else:
+            logger.info("Business Analyst: LLM mode (provider %s, model %s, backend %s)",
+                        settings.provider, settings.model, settings.backend)
+    else:
+        logger.info("Business Analyst: mock mode (BA_MODE=mock); set BA_MODE=llm for real analysis")
+    return settings
+
+
 @asynccontextmanager
 async def lifespan(app):
+    check_ba_configuration()
     recover_interrupted_projects()
     yield
 
@@ -125,7 +163,10 @@ def recover_interrupted_projects():
     recovered = []
     for project_id in list_project_ids():
         project = load_project(project_id)
-        if project and project.get("status") in PIPELINE_STATES:
+        if project and project.get("status") == "analyzing":
+            analysis_interrupted(project)
+            recovered.append(project_id)
+        elif project and project.get("status") in PIPELINE_STATES:
             project["status"] = "failed"
             project["error"] = {
                 "code": "pipeline_interrupted",
@@ -136,38 +177,138 @@ def recover_interrupted_projects():
     return recovered
 
 
-def run_analysis(project, answers=None, feedback=None):
+def analysis_interrupted(project):
+    """A restart cut off an analysis: keep the reviewed version if there is one."""
+    previous_status = (project.get("analysis") or {}).get("previous_status")
+    project["status"] = previous_status if previous_status and project.get("requirements") else "failed"
+    project["error"] = {
+        "code": "analysis_interrupted",
+        "message": "توقف الخادم أثناء تحليل الفكرة. أعد إرسال طلبك.",
+        "retryable": True,
+    }
+    save_with_timestamp(project)
+
+
+def requirements_compatibility(requirements):
+    """Can the Architect build these requirements? Checked before the user approves them.
+
+    Only for documents ready for review. A refusal (for example two entities or a
+    reference field) is reported, not blocked: approval still works as before and
+    the run stops at the Architect, so the warning lets the user ask for a change first.
+    """
+    if not requirements or requirements.get("status") != "ready_for_review":
+        return None
+    try:
+        build_architecture(requirements)
+    except ArchitectureError as exc:
+        return {
+            "supported": False,
+            "message": "هذه النسخة من بُنيان تبني نوع سجل واحد بلا روابط بين السجلات. "
+                       "اطلب تعديلاً لتبسيط المتطلبات قبل الموافقة، وإلا سيتوقف البناء عند مهندس البرمجيات.",
+            "reasons": list(exc.reasons),
+        }
+    except Exception as exc:  # noqa: BLE001 - an Architect crash must not block the analysis, but must be visible
+        logger.warning("Architect check crashed on requirements under review: %s: %s", type(exc).__name__, str(exc)[:300])
+        return {
+            "supported": False,
+            "message": "تعذّر على مهندس البرمجيات فحص هذه المتطلبات بسبب خطأ داخلي، فقد يتوقف البناء عنده. "
+                       "اطلب تعديلاً بسيطاً أو أبلغ فريق بُنيان.",
+            "reasons": [f"architect_check_failed: {type(exc).__name__}"],
+        }
+    return {"supported": True, "message": None, "reasons": []}
+
+
+def start_analysis(project, background_tasks, kind, answers=None, feedback=None):
+    """Run the Business Analyst for a new idea ("initial"), answers or feedback.
+
+    Mock mode (BA_MODE=mock, the default) answers within the request, as before.
+    LLM mode (BA_MODE=llm) can take minutes, longer than the frontend's request
+    timeout, so the request returns at once with status "analyzing" and the
+    analysis runs in the background; the frontend already polls that status.
+    """
+    try:
+        settings = get_ba_settings()
+    except ConfigError:
+        settings = None  # finish_analysis reports it as "ba_not_configured"
+    # The endpoints have checked this status (awaiting_approval for feedback,
+    # awaiting_clarification for answers); a failed re-analysis returns to it.
+    previous_status = None if kind == "initial" else project["status"]
     project["status"] = "analyzing"
     project["current_agent"] = "business_analyst"
     project["error"] = None
+    project["analysis"] = {
+        "mode": settings.mode if settings else None,
+        "kind": kind,
+        "previous_status": previous_status,
+        "started_at": now_iso(),
+    }
     save_with_timestamp(project)
+    if settings is not None and settings.mode == "llm":
+        background_tasks.add_task(run_analysis_in_background, project["project_id"], answers, feedback)
+        return project
+    return finish_analysis(project, answers=answers, feedback=feedback, settings=settings)
+
+
+def run_analysis_in_background(project_id, answers, feedback):
+    project = load_project(project_id)
+    if project is None or project.get("status") != "analyzing":
+        return
     try:
+        finish_analysis(project, answers=answers, feedback=feedback)
+    except Exception:  # noqa: BLE001 - storage itself failed; recovery on restart handles the project
+        logger.exception("Business Analyst: could not save the analysis of project %s", project_id)
+
+
+def finish_analysis(project, answers=None, feedback=None, settings=None):
+    """Call the Business Analyst and store the result, or a safe error. Never falls back to mock."""
+    analysis = project.setdefault("analysis", {})
+    previous_requirements = project.get("requirements") if feedback else None
+    started = time.monotonic()
+    try:
+        if settings is None:
+            settings = get_ba_settings()  # raises ConfigError for an invalid BA_MODE
         result = analyze(
             idea=project["idea"],
             answers=answers,
             feedback=feedback,
-            mode="mock",
+            settings=settings,
+            previous_requirements=previous_requirements,
         )
-        project["requirements"] = result.model_dump(mode="json")
-        if result.status == "ready_for_review":
-            project["status"] = "awaiting_approval"
-        elif result.status == "needs_clarification":
-            project["status"] = "awaiting_clarification"
-        elif result.status == "rejected_out_of_scope":
-            project["status"] = "rejected"
-        else:
-            raise ValueError("Unexpected analyst status")
+        status = STATUS_FOR_VERDICT[result.status]
+    except Exception as exc:  # noqa: BLE001 - every failure becomes a safe, stored error
+        failure = describe_failure(exc)
+        logger.warning("Business Analyst failed: project %s, mode %s, kind %s, code %s, %s",
+                       project["project_id"], analysis.get("mode"), analysis.get("kind"), failure.code, failure.detail)
+        project["error"] = failure.as_error()
+        previous_status = analysis.get("previous_status")
+        # A failed revision keeps the version the user reviewed, so nothing is lost and they can retry.
+        project["status"] = previous_status if previous_status and project.get("requirements") else "failed"
+        analysis.update(outcome="failed", seconds=round(time.monotonic() - started, 1))
         save_with_timestamp(project)
-    except Exception:
-        project["status"] = "failed"
-        project["error"] = {"code": "analysis_failed", "message": "Business Analyst failed"}
-        save_with_timestamp(project)
-        raise HTTPException(status_code=500, detail="Business Analyst failed")
+        return project
+
+    requirements = result.model_dump(mode="json")
+    if feedback:
+        project["revision"] = {
+            "feedback": feedback,
+            "at": now_iso(),
+            "mode": settings.mode,
+            **summarize_revision(previous_requirements, requirements),
+        }
+    else:
+        project.pop("revision", None)  # a new analysis is not a revision of the reviewed version
+    project["requirements"] = requirements
+    project["status"] = status
+    project["compatibility"] = requirements_compatibility(requirements)
+    analysis.update(outcome="succeeded", seconds=round(time.monotonic() - started, 1))
+    save_with_timestamp(project)
+    logger.info("Business Analyst: project %s, mode %s, kind %s, verdict %s, %.1f s",
+                project["project_id"], settings.mode, analysis.get("kind"), result.status, analysis["seconds"])
     return project
 
 
 @app.post("/projects", status_code=201)
-def create_project(data: ProjectRequest):
+def create_project(data: ProjectRequest, background_tasks: BackgroundTasks):
     timestamp = now_iso()
     project = {
         "project_id": str(uuid.uuid4()),
@@ -183,7 +324,7 @@ def create_project(data: ProjectRequest):
         "updated_at": timestamp,
     }
     save_project(project)
-    return run_analysis(project)
+    return start_analysis(project, background_tasks, "initial")
 
 
 @app.get("/projects/{project_id}")
@@ -213,17 +354,19 @@ def approve_project(project_id: uuid.UUID, data: ApprovalRequest, background_tas
         raise HTTPException(status_code=422, detail="Feedback is required when requesting changes")
     project["requirements_approved"] = False
     project["feedback"] = data.feedback
-    return run_analysis(project, answers=project.get("answers"), feedback=data.feedback)
+    project.setdefault("feedback_history", []).append({"feedback": data.feedback, "at": now_iso()})
+    return start_analysis(project, background_tasks, "feedback", answers=project.get("answers"), feedback=data.feedback)
 
 @app.post("/projects/{project_id}/answers")
-def submit_answers(project_id: uuid.UUID, data: AnswersRequest):
+def submit_answers(project_id: uuid.UUID, data: AnswersRequest, background_tasks: BackgroundTasks):
     project = get_existing_project(project_id)
     if project["status"] != "awaiting_clarification":
         raise HTTPException(status_code=409, detail="Project is not awaiting clarification")
     if not data.answers or not any(value.strip() for value in data.answers.values()):
         raise HTTPException(status_code=422, detail="At least one non-empty answer is required")
-    project["answers"] = data.answers
-    return run_analysis(project, answers=data.answers)
+    # Answers from earlier rounds are kept; a new answer to the same question replaces the old one.
+    project["answers"] = {**(project.get("answers") or {}), **data.answers}
+    return start_analysis(project, background_tasks, "answers", answers=project["answers"])
 
 
 def file_response(path, name, headers=None):

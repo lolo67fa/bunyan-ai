@@ -14,7 +14,7 @@ SAMPLES = AGENT_DIR / "samples"
 def _offline_env(monkeypatch):
     """Force mock mode and hide any real keys so a test can never spend money."""
     monkeypatch.setenv("BA_MODE", "mock")
-    for var in ("OPENAI_API_KEY", "ANTHROPIC_API_KEY"):
+    for var in ("OPENAI_API_KEY", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"):
         monkeypatch.delenv(var, raising=False)
     # Stop config.load_dotenv_if_available() from re-reading a developer's .env.
     monkeypatch.setattr("backend.agents.business_analyst.config.load_dotenv_if_available", lambda: None)

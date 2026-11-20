@@ -1,8 +1,13 @@
-# One real LLM analysis by the Business Analyst Agent (owner: Ghala).
+# Live tests of the real Business Analyst (owner: Ghala). Manual only: never on push or PR.
 #
-# Manual only: it never runs on push or pull request. Each run makes ONE paid
-# Anthropic request (claude-opus-5-5), after two free pre-flight calls (Models API
-# and token counting) that verify the model and measure the prompt.
+# test=one-call (default): ONE paid Anthropic request (claude-opus-5-5), after two free
+#   pre-flight calls (Models API and token counting) that verify the model and measure the prompt.
+# test=journey: the real React UI and backend (BA_MODE=llm) in one job; Playwright clicks
+#   through idea -> analysis -> review -> one change request -> approve -> Architect,
+#   Developer, QA (real Playwright), Project Manager -> delivery and ZIP.
+#   At most 2 paid requests (analysis and the one revision), each capped at BA_MAX_TOKENS
+#   output tokens, with every retry and fallback off. If the idea needs clarification the
+#   journey stops there. The API key is given only to the step that starts the backend.
 #
 # GitHub only offers "Run workflow" for workflows on the default branch, so this
 # file must be merged into main before it can be started. The Business Analyst
@@ -17,9 +22,23 @@ on:
         required: true
         default: feature/ghala-analyst
       confirm:
-        description: Type RUN-ONE-PAID-CALL to confirm one paid Anthropic request
+        description: Type RUN-ONE-PAID-CALL (one-call) or RUN-LIVE-JOURNEY (journey, at most 2 paid requests)
         required: true
         default: ""
+      test:
+        description: one-call or journey
+        required: false
+        type: choice
+        options: [one-call, journey]
+        default: one-call
+      idea:
+        description: journey only - the application idea (Arabic or English)
+        required: false
+        default: "أبغى موقع لإدارة المخزون أقدر أضيف فيه المنتجات وأعدل كمياتها وأسعارها وأحذف المنتجات."
+      feedback:
+        description: journey only - the one change to request after the first analysis
+        required: false
+        default: "أضف حقل رقم جوال المورد"
 
 permissions:
   contents: read
@@ -30,6 +49,7 @@ concurrency:
 
 jobs:
   live-test:
+    if: inputs.test != 'journey'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -41,6 +61,8 @@ jobs:
       BA_MAX_RETRIES: "0"      # no second attempt when the answer fails validation
       BA_FALLBACKS: "off"      # no server-side fallback to another model on refusal
       BA_SDK_MAX_RETRIES: "0"  # no SDK transport retries on 429/5xx
+      BA_MAX_TOKENS: "32000"   # output cap: the most this one call can cost is about $0.67 on claude-opus-5-5
+      BA_REQUEST_TIMEOUT: "600"  # seconds; the job itself stops at 20 minutes
       BA_VERBOSE: "false"
       PYTHONIOENCODING: utf-8
     steps:
@@ -92,5 +114,105 @@ jobs:
         with:
           name: ba-live-test-${{ github.run_id }}
           path: live-test-output/
+          if-no-files-found: warn
+          retention-days: 30
+
+  journey:
+    if: inputs.test == 'journey'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      BA_MODE: llm
+      BA_LLM_PROVIDER: anthropic
+      BA_LLM_MODEL: claude-opus-5-5
+      BA_LLM_BACKEND: direct
+      BA_EFFORT: high
+      BA_MAX_RETRIES: "0"        # no second attempt when an answer fails validation
+      BA_SDK_MAX_RETRIES: "0"    # no SDK retries on 429/5xx
+      BA_FALLBACKS: "off"        # no billed fallback to another model on refusal
+      BA_MAX_TOKENS: "32000"     # output cap per request: at most about $0.68 each on claude-opus-5-5
+      BA_REQUEST_TIMEOUT: "600"
+      BUNYAN_QA: "on"
+      PYTHONIOENCODING: utf-8
+    steps:
+      - name: Require confirmation
+        if: inputs.confirm != 'RUN-LIVE-JOURNEY'
+        run: |
+          echo "::error::Confirmation text did not match RUN-LIVE-JOURNEY. No API call was made."
+          exit 1
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ba_ref }}
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install the backend (Business Analyst direct backend, no CrewAI)
+        run: |
+          python -m pip install --disable-pip-version-check --quiet fastapi uvicorn httpx \
+            -r backend/agents/business_analyst/requirements-direct.txt
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install Playwright (QA agent and the journey)
+        working-directory: tests/e2e
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Build the frontend against this backend
+        working-directory: frontend
+        env:
+          VITE_API_MODE: http
+          VITE_API_BASE_URL: http://127.0.0.1:8000
+        run: |
+          npm ci
+          npm run build
+
+      - name: Start the backend (the only step with the API key)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          nohup python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 \
+            --log-config .github/live/uvicorn-log.json > backend.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -s -o /dev/null http://127.0.0.1:8000/projects/00000000-0000-0000-0000-000000000000 && break
+            sleep 1
+          done
+          grep "Business Analyst:" backend.log
+
+      - name: Start the frontend
+        working-directory: frontend
+        run: |
+          nohup npx vite preview --host 127.0.0.1 --port 4173 --strictPort > ../frontend.log 2>&1 &
+          for i in $(seq 1 30); do curl -s -o /dev/null http://127.0.0.1:4173/ && break; sleep 1; done
+
+      - name: Run the journey through the UI
+        env:
+          FRONTEND_URL: http://127.0.0.1:4173
+          API_URL: http://127.0.0.1:8000
+          IDEA: ${{ inputs.idea }}
+          FEEDBACK: ${{ inputs.feedback }}
+        run: node tests/e2e/live/journey.mjs --out live-journey
+
+      - name: Usage, cost and summary
+        if: always()
+        run: |
+          mkdir -p live-journey
+          cp backend.log frontend.log live-journey/ 2>/dev/null || true
+          python .github/live/summarize.py backend.log live-journey
+          cat live-journey/summary.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the journey
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ba-live-journey-${{ github.run_id }}
+          path: live-journey/
           if-no-files-found: warn
           retention-days: 30

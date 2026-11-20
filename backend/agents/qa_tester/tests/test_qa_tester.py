@@ -7,6 +7,7 @@ Run from the repository root:
 
 import csv
 import shutil
+from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
@@ -18,11 +19,16 @@ from backend.agents.qa_tester.schema import QAReport
 
 FIXTURE_APP = "tests/e2e/fixtures/task-manager"
 REQUIREMENTS = "backend/agents/business_analyst/samples/outputs/task_manager_en.requirements.json"
+APPOINTMENT_REQUIREMENTS = "backend/agents/business_analyst/samples/outputs/appointment_booking_en.requirements.json"
+APPOINTMENT_ARCHITECTURE = "backend/agents/architect/samples/outputs/appointment_booking_en.architecture.json"
 CHECK_IDS = [
     "create_item", "list_items", "edit_item", "delete_item",
     "persist_after_refresh", "reject_incomplete_input", "empty_state", "error_message_visible",
 ]
 needs_node = pytest.mark.skipif(shutil.which("npx") is None, reason="Node.js (npx) is not installed")
+needs_architect_samples = pytest.mark.skipif(
+    not Path(APPOINTMENT_ARCHITECTURE).exists(), reason="Architect samples are not on this branch yet (PR #4)"
+)
 
 
 def make_report(statuses):
@@ -42,7 +48,7 @@ def make_report(statuses):
     ]
     passed = statuses.count("passed")
     return {
-        "schema_version": "0.1.0-proposal",
+        "schema_version": "0.2.0-proposal",
         "app": {"name": "Task Manager", "language": "en"},
         "entity": "Task",
         "inputs": {"is_harness_fixture": True},
@@ -75,6 +81,11 @@ def test_rejects_folder_without_index_html():
 def test_rejects_missing_requirements():
     with pytest.raises(FileNotFoundError):
         run_qa(FIXTURE_APP, "does/not/exist.json")
+
+
+def test_rejects_missing_architecture():
+    with pytest.raises(FileNotFoundError):
+        run_qa(FIXTURE_APP, REQUIREMENTS, architecture_path="does/not/exist.json")
 
 
 def test_rejects_third_repair_attempt():
@@ -132,3 +143,15 @@ def test_real_run_finds_storage_defect(monkeypatch):
     report = run_qa(FIXTURE_APP, REQUIREMENTS, attempt=1, app_path="/?bug=no-persist")
     assert report["run"]["attempt"] == 1
     assert [d["check_id"] for d in report["defects"]] == ["persist_after_refresh"]
+
+
+@needs_node
+@needs_architect_samples
+def test_real_run_with_architecture(monkeypatch):
+    """Appointment sample: Service is a required select without a default (empty_option)."""
+    monkeypatch.setattr(runner, "append_run", lambda report: None)
+    report = run_qa(FIXTURE_APP, APPOINTMENT_REQUIREMENTS, architecture_path=APPOINTMENT_ARCHITECTURE)
+    assert report["summary"]["passed"] == 8
+    assert report["inputs"]["architecture_path"].endswith("appointment_booking_en.architecture.json")
+    compared = [v["path"] for c in report["checks"] for v in c["verbatim_compared"]]
+    assert "screens.form.save_button" in compared

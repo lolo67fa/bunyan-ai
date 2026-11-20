@@ -149,8 +149,9 @@ class StandInRunner:
         self.error = error
         self.calls = []
 
-    def __call__(self, app_dir, requirements_path, attempt=0, app_path="/"):
-        self.calls.append({"app_dir": Path(app_dir), "requirements_path": Path(requirements_path), "attempt": attempt})
+    def __call__(self, app_dir, requirements_path, attempt=0, app_path="/", architecture_path=None):
+        self.calls.append({"app_dir": Path(app_dir), "requirements_path": Path(requirements_path), "attempt": attempt,
+                           "architecture_path": architecture_path and Path(architecture_path)})
         if self.error is not None:
             raise self.error
         return copy.deepcopy(self.report)
@@ -196,8 +197,10 @@ def test_qa_runner_gets_the_generated_app_saved_requirements_and_attempt_0(tmp_p
         "app_dir": tmp_path / "app",
         "requirements_path": tmp_path / "requirements.json",
         "attempt": 0,
+        "architecture_path": tmp_path / "architecture.json",  # so QA v0.2 compares the Architect's exact texts
     }]
     assert (tmp_path / "app" / "index.html").is_file()  # the app existed when QA was called
+    assert (tmp_path / "architecture.json").is_file()
 
 
 def test_passed_run_sets_metrics_and_summary(tmp_path):
@@ -492,7 +495,7 @@ def test_only_one_qa_run_at_a_time(tmp_path):
     state = {"inside": 0, "max": 0, "order": []}
     guard = threading.Lock()
 
-    def slow_runner(app_dir, requirements_path, attempt=0, app_path="/"):
+    def slow_runner(app_dir, requirements_path, attempt=0, app_path="/", architecture_path=None):
         with guard:
             state["inside"] += 1
             state["max"] = max(state["max"], state["inside"])

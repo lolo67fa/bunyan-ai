@@ -19,7 +19,7 @@ Not implemented yet:
 - QA ↔ Developer repair loop. `backend/agents/developer/repair.py` only coordinates attempts; no repair strategy exists, so QA runs once (`attempt` 0) and `repair_attempt` stays 0.
 - CrewAI. The Architect and Developer are deterministic Python functions, so the pipeline calls them directly.
 
-The Business Analyst runs before this pipeline, in `POST /projects`, and is still fixed to mock mode in `backend/main.py`.
+The Business Analyst runs before this pipeline, in `POST /projects` (and `/answers`, and `/approve` with feedback). `BA_MODE` chooses mock (default) or a real LLM; in LLM mode the analysis runs in the background with status `analyzing`. See the root `.env.example`.
 
 ## Pipeline
 

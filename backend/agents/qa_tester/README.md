@@ -13,6 +13,7 @@ report = run_qa(
     app_dir="path/to/generated/app",          # folder with index.html
     requirements_path="path/to/requirements.json",
     attempt=0,                                # 0 = first run, 1-2 = re-test after a repair
+    architecture_path="path/to/architecture.json",  # optional: verbatim texts and number formats
 )
 report["summary"]["all_passed"]   # True only if all 8 checks passed
 report["defects"]                 # failed checks, to send to the Developer
@@ -22,9 +23,9 @@ Needs Node.js and, once, `npm install` and `npx playwright install chromium` in 
 
 ## What it does
 
-1. Checks the inputs: `index.html` exists, `requirements.json` exists, `attempt` is 0, 1 or 2 (at most 2 repair attempts).
+1. Checks the inputs: `index.html` exists, `requirements.json` exists, `architecture.json` exists when given, `attempt` is 0, 1 or 2 (at most 2 repair attempts).
 2. Deletes the previous report, so old results are never returned.
-3. Runs `npx playwright test` in `tests/e2e`, passing `APP_DIR`, `REQUIREMENTS` and `QA_ATTEMPT`.
+3. Runs `npx playwright test` in `tests/e2e`, passing `APP_DIR`, `REQUIREMENTS`, `ARCHITECTURE` and `QA_ATTEMPT`.
 4. Reads `tests/e2e/reports/test_report.json` and validates it with `QAReport` (`schema.py`). The summary must match the checks: no invented passes.
 5. Adds one line to `tests/e2e/reports/quality_log.csv`: time, app, attempt, passed/total, pass rate, run time, failed checks.
 
@@ -47,7 +48,7 @@ From the repository root:
 python -m pytest backend/agents/qa_tester/tests -v
 ```
 
-The two real-run tests are skipped when Node.js is not installed.
+The real-run tests are skipped when Node.js is not installed. The Appointment run (required select without a default) is skipped until the Architect samples are on the branch (PR #4).
 
 ## Open points
 
