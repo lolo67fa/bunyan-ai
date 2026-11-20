@@ -1,0 +1,75 @@
+# Deploying BUNYAN AI (club demo)
+
+One Docker image runs everything: the production React frontend, the FastAPI backend,
+the five agents, and Node.js with Playwright Chromium for the real QA Tester. The
+frontend and the API share one origin, so there is no CORS setup and one HTTPS address.
+
+```
+browser ──HTTPS──► platform edge (TLS) ──► container :$PORT
+                                            uvicorn (non-root "bunyan")
+                                            ├─ /            React app (frontend-dist)
+                                            ├─ /projects/…  API, artifacts, preview, ZIP
+                                            ├─ /health      health check (no login)
+                                            └─ QA: Playwright Chromium on 127.0.0.1 only
+                                            /data  projects + generated files (volume)
+```
+
+## Security for a shared demo
+
+| Control | How |
+|---|---|
+| Login on every route (API, artifacts, preview, download, the app itself) | HTTP Basic with `BUNYAN_USERS`, checked in the backend. Only `/health` is open. CORS is not used as access control. |
+| Testers cannot see each other's projects | Each project stores its `owner`; anyone else gets 404 on every route. |
+| Password guessing | 10 failures per address in 5 minutes, then 429. Passwords are stored as PBKDF2-SHA256 hashes. |
+| Request and generation limits | Per user: write requests per minute, projects per day, analyses per day. All users: real-LLM analyses per day, analyses at the same time. Counters survive restarts (`/data/usage.json`). |
+| Anthropic spending | One paid request per analysis (`BA_MAX_RETRIES=0`, `BA_SDK_MAX_RETRIES=0`, `BA_FALLBACKS=off`), `BA_MAX_TOKENS=32000` (at most about $0.68 per request on claude-opus-5-5), and the daily cap above. Also set a monthly spend limit on the key's workspace in the Anthropic Console. |
+| Secrets | Only as platform variables at runtime. Nothing in the image or the frontend bundle (`.dockerignore` excludes `.env` files). The QA process that runs generated code gets an environment without the API key or the user list. |
+| Generated app preview | Served with `Content-Security-Policy: sandbox …` (opaque origin, even in its own tab): it cannot read this site's storage or cookies, script the page around it, or make network requests. Records live in memory there; the downloaded ZIP uses localStorage normally. |
+| Generated code and QA | Generated apps are the fixed template filled with escaped JSON (no `innerHTML`). QA serves them on 127.0.0.1 inside the container and runs one QA at a time. |
+| Container | Non-root user (uid 10001); the entrypoint only fixes `/data` ownership, then drops privileges. Compose drops all other capabilities, sets `no-new-privileges`, 2 GB RAM, 2 CPUs, 512 processes. |
+| Paths | Project ids are UUIDs; artifact and preview names come from a fixed list and are resolved inside the project folder. |
+
+## Run locally (Docker Compose)
+
+```bash
+cp deploy.env.example deploy.env
+python3 -m backend.security hash-password ghala     # prints ghala:pbkdf2:…
+# put the printed line(s) into BUNYAN_USERS in deploy.env, comma separated
+docker compose up --build -d
+docker compose ps                                     # STATUS shows (healthy)
+open http://localhost:8080                            # the browser asks for the login
+```
+
+Data stays in the `bunyan-data` volume across `docker compose restart` and `down`/`up`
+(`docker compose down -v` deletes it).
+
+## Deploy on Railway
+
+1. Create a project from this GitHub repository and choose the branch `deploy/club-demo`.
+   Railway builds the `Dockerfile` (see `railway.json`, health check `/health`).
+2. Add a volume to the service, mounted at `/data`.
+3. Service variables: everything from `deploy.env.example` with real values. Put
+   `BUNYAN_USERS` and, for real analysis, `ANTHROPIC_API_KEY` as variables there (never in git).
+4. Settings, Networking: generate a public domain (`https://<name>.up.railway.app`).
+5. Check: `curl https://<name>.up.railway.app/health` returns `{"status":"ok"}` and the
+   site asks for a login.
+
+Size the service at 2 GB RAM (Chromium for QA plus the backend). Hobby plan: $5/month
+including $5 of usage; usage is about $10 per GB of RAM and $20 per vCPU per month.
+
+## Switching on the real Business Analyst
+
+Set `BA_MODE=llm`, `BA_LLM_PROVIDER=anthropic`, `BA_LLM_MODEL=claude-opus-5-5`,
+`BA_LLM_BACKEND=direct` and the `ANTHROPIC_API_KEY` secret, then redeploy. The backend
+logs `Business Analyst: LLM mode (...)` at startup and one `BA model call:` line with the
+token usage for each paid request. With `BA_MODE=mock` no request reaches Anthropic.
+
+## Tester instructions
+
+1. Open the address you were given and sign in with your user name and password.
+2. "مشروع جديد": describe a simple app that manages one kind of record (tasks, products,
+   appointments…), in Arabic or English.
+3. Review the requirements. Use "طلب تعديل" to ask for a change, or approve.
+4. Wait for the five agents. Then open the preview, the test report, the plan, and
+   download the ZIP (open `index.html` from it on your computer).
+5. Limits: a few projects per person per day. Please do not enter personal data.

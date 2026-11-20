@@ -159,7 +159,9 @@ def test_preview_files_carry_the_sandbox_policy(client, pid):
         headers = client.get(f"/projects/{pid}/preview/{path}").headers
         policy = headers["content-security-policy"]
         assert "default-src 'none'" in policy  # no requests to this API or anywhere else
-        assert "script-src 'self'" in policy and "'unsafe-inline'" not in policy
+        # Its own origin, written out ('self' differs between browsers in a sandboxed document).
+        assert "script-src http://testserver;" in policy and "'unsafe-inline'" not in policy
+        assert policy.startswith("sandbox allow-scripts allow-forms") and "allow-same-origin" not in policy
         assert headers["x-content-type-options"] == "nosniff"
         assert headers["cache-control"] == "no-store"
         assert "x-frame-options" not in headers  # the frontend shows the preview in an iframe

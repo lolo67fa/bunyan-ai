@@ -17,6 +17,10 @@ const API = process.env.API_URL ?? 'http://127.0.0.1:8000';
 const IDEA = process.env.IDEA ?? 'أبغى موقع لإدارة المخزون أقدر أضيف فيه المنتجات وأعدل كمياتها وأسعارها وأحذف المنتجات.';
 const FEEDBACK = process.env.FEEDBACK ?? 'أضف حقل رقم جوال المورد';
 const OUT = process.argv.includes('--out') ? process.argv[process.argv.indexOf('--out') + 1] : 'live-journey';
+// For a deployment with BUNYAN_AUTH=required: the tester's login (Basic auth).
+const USER = process.env.JOURNEY_USER;
+const PASSWORD = process.env.JOURNEY_PASSWORD;
+const AUTH = USER ? { Authorization: `Basic ${Buffer.from(`${USER}:${PASSWORD ?? ''}`).toString('base64')}` } : {};
 const ANALYSIS_TIMEOUT = 12 * 60_000; // a real model can take minutes
 const BUILD_TIMEOUT = 10 * 60_000;
 
@@ -28,7 +32,7 @@ const step = (name, extra = {}) => {
   console.log(`[${Math.round((Date.now() - started) / 1000)}s] ${name}`, Object.keys(extra).length ? JSON.stringify(extra) : '');
 };
 const api = async (path) => {
-  const res = await fetch(`${API}${path}`);
+  const res = await fetch(`${API}${path}`, { headers: AUTH });
   if (!res.ok) throw new Error(`GET ${path}: ${res.status}`);
   return res.headers.get('content-type')?.includes('json') ? res.json() : res.text();
 };
@@ -45,7 +49,12 @@ const waitForStatus = (id, done, timeout) => waitFor(id, (p) => done.includes(p.
 const STOPPED = ['awaiting_approval', 'awaiting_clarification', 'rejected', 'failed'];
 
 const browser = await chromium.launch();
-const page = await browser.newPage({ viewport: { width: 1280, height: 900 }, locale: 'ar' });
+const context = await browser.newContext({
+  viewport: { width: 1280, height: 900 },
+  locale: 'ar',
+  ...(USER ? { httpCredentials: { username: USER, password: PASSWORD ?? '' } } : {}),
+});
+const page = await context.newPage();
 const errors = [];
 page.on('pageerror', (e) => errors.push(String(e)));
 const shot = (name) => page.screenshot({ path: join(OUT, `${name}.png`), fullPage: true });
@@ -110,7 +119,7 @@ try {
   report.final = { status: project.status, qa: project.qa, metrics: project.metrics, error: project.error };
 
   // 5. What was delivered
-  const zip = await fetch(`${API}/projects/${id}/download`);
+  const zip = await fetch(`${API}/projects/${id}/download`, { headers: AUTH });
   report.zip = { status: zip.status, type: zip.headers.get('content-type'), bytes: (await zip.arrayBuffer()).byteLength };
   if (project.status === 'completed') {
     const architecture = await api(`/projects/${id}/artifacts/architecture.json`);

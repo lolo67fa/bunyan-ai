@@ -34,8 +34,12 @@ def run_qa(app_dir, requirements_path, attempt=0, app_path="/", architecture_pat
     if npx is None:
         raise RuntimeError("npx not found. Install Node.js first.")
 
-    # Tell the test suite what to test
-    env = os.environ.copy()
+    # Tell the test suite what to test. Secrets stay out of the process that runs generated code.
+    env = {k: v for k, v in os.environ.items()
+           if not k.startswith("ANTHROPIC_") and k not in {"OPENAI_API_KEY", "BUNYAN_USERS"}}
+    # The suite's local server reads PORT; on a host that sets PORT for the web server
+    # (Docker, Railway) it would collide with the app itself.
+    env["PORT"] = os.environ.get("BUNYAN_QA_PORT", "4317")
     env["APP_DIR"] = str(app_dir)
     env["REQUIREMENTS"] = str(requirements_path)
     env["QA_ATTEMPT"] = str(attempt)

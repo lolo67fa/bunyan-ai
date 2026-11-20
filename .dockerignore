@@ -1,0 +1,18 @@
+# Keep the build context small and free of secrets.
+.git
+.github
+**/.env
+**/.env.*
+!**/.env.example
+**/node_modules
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+frontend/dist
+backend/data
+tests/e2e/reports
+tests/e2e/test-results
+venv
+.venv
+*.log
+live-journey

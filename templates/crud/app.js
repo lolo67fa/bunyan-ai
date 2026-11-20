@@ -18,8 +18,10 @@ const CONFIG = __BUNYAN_CONFIG__;
   let editingId = null, query = '', activeFilters = {};
   const element = (tag, attrs = {}, value) => { const n = document.createElement(tag); Object.entries(attrs).forEach(([k,v]) => n.setAttribute(k,v)); if(value !== undefined) n.textContent = String(value); return n; };
   const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
-  const load = () => { try { const x = JSON.parse(localStorage.getItem(storageKey) || '[]'); return Array.isArray(x) ? x : []; } catch { return []; } };
-  const store = rows => { try { localStorage.setItem(storageKey, JSON.stringify(rows)); return true; } catch { toast(isArabic?'تعذر حفظ البيانات':'Could not save records'); return false; } };
+  // A sandboxed preview has no localStorage (SecurityError): records then live in memory for the visit.
+  let memoryRows = null;
+  const load = () => { if(memoryRows) return memoryRows.slice(); try { const x = JSON.parse(localStorage.getItem(storageKey) || '[]'); return Array.isArray(x) ? x : []; } catch { return []; } };
+  const store = rows => { try { localStorage.setItem(storageKey, JSON.stringify(rows)); return true; } catch (e) { if(e && e.name === 'SecurityError'){ memoryRows = rows.slice(); return true; } toast(isArabic?'تعذر حفظ البيانات':'Could not save records'); return false; } };
   const toast = message => { $('toast').textContent=message; $('toast').hidden=false; };
   const display = (field, value) => { if(value == null || value === '') return ''; if(field?.type === 'enum') return field.options?.find(o=>o.value===value)?.label ?? String(value); if(field?.type === 'boolean') return value ? (isArabic?'نعم':'Yes') : (isArabic?'لا':'No'); if(field?.display_format?.decimals != null && value !== '') return Number(value).toFixed(field.display_format.decimals); return String(value); };
   const cols = table.columns;

@@ -6,13 +6,17 @@ import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
-from fastapi import BackgroundTasks, FastAPI, HTTPException
+from pathlib import Path
+
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse, Response
+from fastapi.responses import JSONResponse, RedirectResponse, Response
+from fastapi.staticfiles import StaticFiles
+from starlette.concurrency import run_in_threadpool
 
 from backend.schemas.contracts import ProjectRequest, ApprovalRequest, AnswersRequest
 from backend.storage import save_project, load_project, project_dir, list_project_ids
-from backend import artifacts
+from backend import artifacts, security
 from backend.agents.architect import ArchitectureError, build_architecture
 from backend.agents.business_analyst.analyst import analyze
 from backend.agents.business_analyst.config import ConfigError, get_settings as get_ba_settings
@@ -35,14 +39,30 @@ PIPELINE_STATES = ("designing", "developing", "testing", "documenting")
 # Sent with every generated file. The generated app is untrusted code served
 # from the backend's own origin, so the preview may only load its own files:
 # no inline scripts, no requests to this API or to any other host.
+# "sandbox" gives the preview an opaque origin even when opened in its own tab: it
+# cannot read this site's storage or cookies, script the page around it, or call the
+# API as the logged-in user. The app then keeps its records in memory.
 PREVIEW_HEADERS = {
     "Content-Security-Policy": (
+        "sandbox allow-scripts allow-forms allow-modals; "
         "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
         "base-uri 'none'; form-action 'none'"
     ),
     "X-Content-Type-Options": "nosniff",
     "Cache-Control": "no-store",
 }
+
+def preview_headers(request):
+    """PREVIEW_HEADERS with this server's origin written out instead of 'self'.
+
+    In a sandboxed (opaque-origin) document, browsers differ on what 'self' matches;
+    the explicit origin lets the app load its own style.css and app.js everywhere.
+    """
+    origin = f"{request.url.scheme}://{request.url.netloc}"
+    headers = dict(PREVIEW_HEADERS)
+    headers["Content-Security-Policy"] = headers["Content-Security-Policy"].replace("'self'", origin)
+    return headers
+
 
 # Makes "check the status, then start the pipeline" one step, so two approvals
 # sent at the same moment cannot both start a run.
@@ -75,6 +95,7 @@ def check_ba_configuration():
 
 @asynccontextmanager
 async def lifespan(app):
+    security.check_configuration()
     check_ba_configuration()
     recover_interrupted_projects()
     yield
@@ -99,6 +120,52 @@ app.add_middleware(
 )
 
 
+@app.middleware("http")
+async def access_control(request: Request, call_next):
+    """Server-side access control for every route except the health check.
+
+    With BUNYAN_AUTH=required the request needs valid Basic credentials; the user name
+    is kept on request.state for the ownership checks. CORS is not authentication.
+    """
+    request.state.user = None
+    if request.url.path != "/health" and security.auth_required():
+        client = request.client.host if request.client else "unknown"
+        try:
+            request.state.user = await run_in_threadpool(
+                security.authenticator.authenticate, request.headers.get("authorization"), client
+            )
+        except HTTPException as exc:
+            return JSONResponse({"detail": exc.detail}, status_code=exc.status_code, headers=exc.headers)
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    return response
+
+
+def current_user(request: Request):
+    return getattr(request.state, "user", None)
+
+
+def enforce_limits(user, new_project=False, analysis=False):
+    """Rate and quota checks for a shared deployment. Returns True when an LLM slot was taken."""
+    if not security.auth_required():
+        return False
+    security.limits.check_rate(user)
+    if not analysis:
+        return False
+    try:
+        llm = get_ba_settings().mode == "llm"
+    except ConfigError:
+        llm = False  # the analysis will fail with "ba_not_configured" without calling a model
+    security.limits.reserve(user, new_project=new_project, llm=llm)
+    return llm
+
+
+@app.get("/health", include_in_schema=False)
+def health():
+    return {"status": "ok"}
+
+
 def now_iso():
     return datetime.now(timezone.utc).isoformat()
 
@@ -108,9 +175,10 @@ def save_with_timestamp(project):
     save_project(project)
 
 
-def get_existing_project(project_id):
+def get_existing_project(project_id, user=None):
+    """The project, or 404 when it does not exist or belongs to another user."""
     project = load_project(str(project_id))
-    if project is None:
+    if project is None or not security.can_access(project, user):
         raise HTTPException(status_code=404, detail="Project not found")
     return project
 
@@ -218,7 +286,7 @@ def requirements_compatibility(requirements):
     return {"supported": True, "message": None, "reasons": []}
 
 
-def start_analysis(project, background_tasks, kind, answers=None, feedback=None):
+def start_analysis(project, background_tasks, kind, answers=None, feedback=None, llm_slot=False):
     """Run the Business Analyst for a new idea ("initial"), answers or feedback.
 
     Mock mode (BA_MODE=mock, the default) answers within the request, as before.
@@ -244,19 +312,26 @@ def start_analysis(project, background_tasks, kind, answers=None, feedback=None)
     }
     save_with_timestamp(project)
     if settings is not None and settings.mode == "llm":
-        background_tasks.add_task(run_analysis_in_background, project["project_id"], answers, feedback)
+        background_tasks.add_task(run_analysis_in_background, project["project_id"], answers, feedback, llm_slot)
         return project
-    return finish_analysis(project, answers=answers, feedback=feedback, settings=settings)
-
-
-def run_analysis_in_background(project_id, answers, feedback):
-    project = load_project(project_id)
-    if project is None or project.get("status") != "analyzing":
-        return
     try:
+        return finish_analysis(project, answers=answers, feedback=feedback, settings=settings)
+    finally:
+        if llm_slot:
+            security.limits.release()
+
+
+def run_analysis_in_background(project_id, answers, feedback, llm_slot=False):
+    try:
+        project = load_project(project_id)
+        if project is None or project.get("status") != "analyzing":
+            return
         finish_analysis(project, answers=answers, feedback=feedback)
     except Exception:  # noqa: BLE001 - storage itself failed; recovery on restart handles the project
         logger.exception("Business Analyst: could not save the analysis of project %s", project_id)
+    finally:
+        if llm_slot:
+            security.limits.release()
 
 
 def finish_analysis(project, answers=None, feedback=None, settings=None):
@@ -308,10 +383,12 @@ def finish_analysis(project, answers=None, feedback=None, settings=None):
 
 
 @app.post("/projects", status_code=201)
-def create_project(data: ProjectRequest, background_tasks: BackgroundTasks):
+def create_project(data: ProjectRequest, background_tasks: BackgroundTasks, user=Depends(current_user)):
+    llm_slot = enforce_limits(user, new_project=True, analysis=True)
     timestamp = now_iso()
     project = {
         "project_id": str(uuid.uuid4()),
+        "owner": user,
         "idea": data.prompt,
         "status": "analyzing",
         "current_agent": "business_analyst",
@@ -324,19 +401,25 @@ def create_project(data: ProjectRequest, background_tasks: BackgroundTasks):
         "updated_at": timestamp,
     }
     save_project(project)
-    return start_analysis(project, background_tasks, "initial")
+    return start_analysis(project, background_tasks, "initial", llm_slot=llm_slot)
 
 
 @app.get("/projects/{project_id}")
-def get_project_pipeline(project_id: uuid.UUID):
-    return get_existing_project(project_id)
+def get_project_pipeline(project_id: uuid.UUID, user=Depends(current_user)):
+    return get_existing_project(project_id, user)
 
 
 @app.post("/projects/{project_id}/approve")
-def approve_project(project_id: uuid.UUID, data: ApprovalRequest, background_tasks: BackgroundTasks):
+def approve_project(
+    project_id: uuid.UUID, data: ApprovalRequest, background_tasks: BackgroundTasks, user=Depends(current_user)
+):
+    get_existing_project(project_id, user)  # 404 for someone else's project, before any limit is counted
+    llm_slot = enforce_limits(user, analysis=not data.approved)
     with _approval_lock:
-        project = get_existing_project(project_id)
+        project = get_existing_project(project_id, user)
         if project["status"] != "awaiting_approval":
+            if llm_slot:
+                security.limits.release()
             raise HTTPException(status_code=409, detail="Project is not ready for approval")
 
         if data.approved:
@@ -355,18 +438,21 @@ def approve_project(project_id: uuid.UUID, data: ApprovalRequest, background_tas
     project["requirements_approved"] = False
     project["feedback"] = data.feedback
     project.setdefault("feedback_history", []).append({"feedback": data.feedback, "at": now_iso()})
-    return start_analysis(project, background_tasks, "feedback", answers=project.get("answers"), feedback=data.feedback)
+    return start_analysis(project, background_tasks, "feedback", answers=project.get("answers"),
+                          feedback=data.feedback, llm_slot=llm_slot)
 
 @app.post("/projects/{project_id}/answers")
-def submit_answers(project_id: uuid.UUID, data: AnswersRequest, background_tasks: BackgroundTasks):
-    project = get_existing_project(project_id)
+def submit_answers(project_id: uuid.UUID, data: AnswersRequest, background_tasks: BackgroundTasks,
+                   user=Depends(current_user)):
+    project = get_existing_project(project_id, user)
     if project["status"] != "awaiting_clarification":
         raise HTTPException(status_code=409, detail="Project is not awaiting clarification")
     if not data.answers or not any(value.strip() for value in data.answers.values()):
         raise HTTPException(status_code=422, detail="At least one non-empty answer is required")
+    llm_slot = enforce_limits(user, analysis=True)
     # Answers from earlier rounds are kept; a new answer to the same question replaces the old one.
     project["answers"] = {**(project.get("answers") or {}), **data.answers}
-    return start_analysis(project, background_tasks, "answers", answers=project["answers"])
+    return start_analysis(project, background_tasks, "answers", answers=project["answers"], llm_slot=llm_slot)
 
 
 def file_response(path, name, headers=None):
@@ -374,9 +460,9 @@ def file_response(path, name, headers=None):
 
 
 @app.get("/projects/{project_id}/artifacts/{name}")
-def get_artifact(project_id: uuid.UUID, name: str):
+def get_artifact(project_id: uuid.UUID, name: str, user=Depends(current_user)):
     """One generated file by its artifact name, e.g. architecture.json or app.js."""
-    project = get_existing_project(project_id)
+    project = get_existing_project(project_id, user)
     path = artifacts.artifact_file(project["project_id"], name)
     if path is None:
         raise HTTPException(status_code=404, detail="Artifact not found")
@@ -384,32 +470,32 @@ def get_artifact(project_id: uuid.UUID, name: str):
 
 
 @app.get("/projects/{project_id}/preview", include_in_schema=False)
-def redirect_to_preview(project_id: uuid.UUID):
+def redirect_to_preview(project_id: uuid.UUID, user=Depends(current_user)):
     """The app links style.css and app.js relatively, so it must be opened at .../preview/."""
-    get_existing_project(project_id)
+    get_existing_project(project_id, user)
     return RedirectResponse(url=f"/projects/{project_id}/preview/", status_code=307)
 
 
 @app.get("/projects/{project_id}/preview/")
-def preview_app(project_id: uuid.UUID):
+def preview_app(request: Request, project_id: uuid.UUID, user=Depends(current_user)):
     """The generated application's index.html."""
-    return preview_app_file(project_id, "index.html")
+    return preview_app_file(request, project_id, "index.html", user)
 
 
 @app.get("/projects/{project_id}/preview/{filename}")
-def preview_app_file(project_id: uuid.UUID, filename: str):
+def preview_app_file(request: Request, project_id: uuid.UUID, filename: str, user=Depends(current_user)):
     """A file of the generated application: index.html, style.css or app.js."""
-    project = get_existing_project(project_id)
+    project = get_existing_project(project_id, user)
     path = artifacts.preview_file(project["project_id"], filename)
     if path is None:
         raise HTTPException(status_code=404, detail="Preview file not found")
-    return file_response(path, filename, PREVIEW_HEADERS)
+    return file_response(path, filename, preview_headers(request))
 
 
 @app.get("/projects/{project_id}/download")
-def download_project(project_id: uuid.UUID):
+def download_project(project_id: uuid.UUID, user=Depends(current_user)):
     """ZIP with the generated application and its requirements and architecture."""
-    project = get_existing_project(project_id)
+    project = get_existing_project(project_id, user)
     missing = artifacts.missing_for_download(project["project_id"])
     if missing:
         raise HTTPException(
@@ -426,3 +512,11 @@ def download_project(project_id: uuid.UUID):
             "Cache-Control": "no-store",
         },
     )
+
+
+# The production frontend (the built React app), served from the same origin as the API:
+# one HTTPS address, no CORS, and the same access control as every other route.
+# Mounted last so it never shadows an API route.
+FRONTEND_DIR = os.environ.get("BUNYAN_FRONTEND_DIR", "").strip()
+if FRONTEND_DIR and Path(FRONTEND_DIR).is_dir():
+    app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")

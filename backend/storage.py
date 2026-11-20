@@ -14,8 +14,9 @@ import uuid
 from pathlib import Path
 
 
-DATA_DIR = Path(__file__).resolve().parent / "data"
-DATA_DIR.mkdir(exist_ok=True)
+# BUNYAN_DATA_DIR moves storage to a persistent volume (the Docker image uses /data).
+DATA_DIR = Path(os.environ.get("BUNYAN_DATA_DIR") or Path(__file__).resolve().parent / "data")
+DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def _canonical_id(project_id):
