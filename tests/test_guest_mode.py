@@ -143,7 +143,10 @@ def test_new_guest_identities_are_limited_per_address(guest_mode, monkeypatch):
     monkeypatch.setenv("BUNYAN_MAX_NEW_SESSIONS_PER_IP_PER_HOUR", "3")
     for _ in range(3):
         assert "set-cookie" in guest().get("/").headers  # each new browser gets its guest cookie
-    response = guest().get("/")
+    late = guest()
+    page = late.get("/")  # the public site still loads (shared Wi-Fi), but no new guest is issued
+    assert page.status_code != 429 and "set-cookie" not in page.headers
+    response = late.post("/projects", json={"prompt": IDEA})  # the API needs an identity: refused
     assert response.status_code == 429 and "set-cookie" not in response.headers
 
 
