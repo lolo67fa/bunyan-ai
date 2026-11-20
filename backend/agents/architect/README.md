@@ -8,7 +8,7 @@
 - ✅ Contract (Pydantic) with cross-reference validation.
 - ✅ Deterministic builder `build_architecture(requirements_dict)`; refuses out-of-MVP input with reasons.
 - ✅ Per-field error messages, `no_results`, number display format, empty option for selects without default.
-- ✅ Texts quoted in acceptance criteria are copied verbatim (`verbatim_messages`, rule M1).
+- ✅ Texts quoted in acceptance criteria are copied verbatim (`verbatim_messages`, rule M1); first criterion wins (v0.3.1).
 - ✅ Samples generated from every Business Analyst sample on `main` (`samples/outputs/`).
 - ⏳ LLM layer (enum labels, wording) and CrewAI wiring: not started.
 
