@@ -179,8 +179,10 @@ class GuestSessions:
         with self._lock:
             self._issued.clear()
 
-    def identify(self, cookie: Optional[str], client: str) -> Tuple[str, Optional[str]]:
-        """(user, new cookie value or None). Raises 429 when the address made too many guests."""
+    def identify(self, cookie: Optional[str], client: str, needed: bool = True) -> Tuple[Optional[str], Optional[str]]:
+        """(user, new cookie value or None). When the address made too many guests this hour:
+        raises 429 if the request needs an identity (the API), otherwise returns (None, None)
+        so the public site itself (the React app, its files) still loads, just without a new guest."""
         user = read_guest_cookie(cookie)
         if user is not None:
             return user, None
@@ -191,6 +193,8 @@ class GuestSessions:
             while issued and now - issued[0] > self.WINDOW:
                 issued.popleft()
             if len(issued) >= limit:
+                if not needed:
+                    return None, None
                 raise HTTPException(429, "جلسات جديدة كثيرة من هذا الجهاز أو الشبكة. انتظر قليلاً ثم أعد المحاولة.")
             issued.append(now)
         return issue_guest_cookie()

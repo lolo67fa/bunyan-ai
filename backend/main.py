@@ -1,3 +1,4 @@
+import html
 import logging
 import os
 import threading
@@ -142,11 +143,13 @@ async def access_control(request: Request, call_next):
                 if request.method not in ("GET", "HEAD", "OPTIONS") and not same_origin(request):
                     raise HTTPException(403, "Requests from other sites are not accepted.")
                 request.state.user, new_cookie = security.guest_sessions.identify(
-                    request.cookies.get(security.GUEST_COOKIE), client
+                    request.cookies.get(security.GUEST_COOKIE), client, needed=is_api_path(request.url.path)
                 )
         except HTTPException as exc:
-            return JSONResponse({"detail": exc.detail}, status_code=exc.status_code, headers=exc.headers)
+            return error_response(request, exc)
     response = await call_next(request)
+    if response.headers.get("content-type") == "application/json":
+        response.headers["content-type"] = "application/json; charset=utf-8"  # Safari guesses otherwise
     if new_cookie:
         response.set_cookie(
             security.GUEST_COOKIE, new_cookie, max_age=security.GUEST_SESSION_SECONDS, path="/",
@@ -156,6 +159,53 @@ async def access_control(request: Request, call_next):
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("Referrer-Policy", "no-referrer")
     return response
+
+
+def is_api_path(path: str) -> bool:
+    """Routes that read or change a guest's projects. Everything else is the public React app."""
+    return path == "/projects" or path.startswith("/projects/")
+
+
+_ERROR_TITLES = {401: "تسجيل الدخول مطلوب", 403: "الطلب مرفوض", 404: "الصفحة غير موجودة",
+                 429: "طلبات كثيرة"}
+
+
+def wants_html(request: Request) -> bool:
+    """A browser opening a page (address bar, link), not the app's own fetch() calls."""
+    return request.method in ("GET", "HEAD") and "text/html" in request.headers.get("accept", "")
+
+
+def error_response(request: Request, exc: HTTPException) -> Response:
+    """JSON (UTF-8) for the app's API calls; a small Arabic page when a person opens a URL."""
+    if not wants_html(request):
+        return JSONResponse({"detail": exc.detail}, status_code=exc.status_code, headers=exc.headers,
+                            media_type="application/json; charset=utf-8")
+    title = _ERROR_TITLES.get(exc.status_code, "حدث خطأ")
+    detail = html.escape(str(exc.detail))
+    page = f"""<!doctype html>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>بُنيان: {title}</title>
+<style>
+:root{{color-scheme:light dark;--bg:#F8F7FC;--card:#fff;--text:#1B1D3A;--muted:#5B5F7A;--accent:#5B3FD9}}
+@media (prefers-color-scheme:dark){{:root{{--bg:#0B0D1F;--card:#15183A;--text:#F1F0FA;--muted:#A9ACC9;--accent:#9C87FF}}}}
+body{{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--bg);color:var(--text);
+font-family:system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;padding:16px;box-sizing:border-box}}
+main{{background:var(--card);max-width:440px;width:100%;border-radius:16px;padding:28px;text-align:center;
+box-shadow:0 8px 30px rgba(0,0,0,.08)}}
+h1{{font-size:1.4rem;margin:0 0 12px}}p{{color:var(--muted);line-height:1.7;margin:0 0 20px}}
+a{{display:inline-block;background:var(--accent);color:#fff;text-decoration:none;padding:10px 22px;border-radius:10px}}
+</style></head>
+<body><main><h1>{title}</h1><p>{detail}</p><a href="/">العودة إلى بُنيان</a></main></body></html>"""
+    headers = {k: v for k, v in (exc.headers or {}).items() if k.lower() != "www-authenticate"} \
+        if exc.status_code != 401 else (exc.headers or {})
+    return Response(page, status_code=exc.status_code, headers=headers, media_type="text/html; charset=utf-8")
+
+
+@app.exception_handler(HTTPException)
+async def http_error(request: Request, exc: HTTPException):
+    """Route errors (e.g. a preview link that is not yours, 404) the same way as the middleware's."""
+    return error_response(request, exc)
 
 
 def same_origin(request):
