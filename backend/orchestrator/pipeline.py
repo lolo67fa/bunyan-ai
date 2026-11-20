@@ -186,7 +186,7 @@ def _develop(requirements: Dict[str, Any], architecture: Dict[str, Any], app_dir
 def _test(project: dict, workdir: Path, app_dir: Path, qa_runner: QaRunner, started: float) -> Dict[str, Any]:
     """Run QA, store its report and put the real numbers on the project. Returns the report."""
     try:
-        result = run_qa_stage(workdir, app_dir, workdir / REQUIREMENTS_FILE, qa_runner)
+        result = run_qa_stage(workdir, app_dir, workdir / REQUIREMENTS_FILE, qa_runner, workdir / ARCHITECTURE_FILE)
     except QaBlocked as blocked:
         project["qa"] = {"status": QA_BLOCKED, "reason": blocked.message}
         if blocked.report is not None:

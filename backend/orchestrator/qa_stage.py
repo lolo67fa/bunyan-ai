@@ -99,12 +99,18 @@ def _qa_lock():
                     handle.close()
 
 
-def run_qa_stage(workdir: Path, app_dir: Path, requirements_path: Path, runner: QaRunner) -> QaResult:
-    """Run QA once (attempt 0) and return its outcome. Raises ``QaBlocked``."""
+def run_qa_stage(
+    workdir: Path, app_dir: Path, requirements_path: Path, runner: QaRunner, architecture_path: Optional[Path] = None
+) -> QaResult:
+    """Run QA once (attempt 0) and return its outcome. Raises ``QaBlocked``.
+
+    With ``architecture_path``, QA v0.2 also compares the exact texts the Architect chose
+    (button labels, required-field and delete-confirmation messages, number formats).
+    """
     workdir = Path(workdir)
     with _qa_lock():
         try:
-            report = runner(app_dir, requirements_path, attempt=0)
+            report = runner(app_dir, requirements_path, attempt=0, architecture_path=architecture_path)
         except subprocess.TimeoutExpired as exc:
             raise QaBlocked("qa_failed", f"QA did not finish within {int(exc.timeout)} seconds") from exc
         except Exception as exc:
@@ -207,6 +213,8 @@ def _localise(report: Dict[str, Any], workdir: Path) -> Dict[str, Any]:
     if isinstance(inputs, dict):
         inputs["requirements_path"] = "requirements.json"
         inputs["app_dir"] = "app"
+        if inputs.get("architecture_path"):
+            inputs["architecture_path"] = "architecture.json"
 
     roots = sorted({str(workdir.resolve()), str(workdir), str(repo_dir)}, key=len, reverse=True)
     return _scrub(report, roots)

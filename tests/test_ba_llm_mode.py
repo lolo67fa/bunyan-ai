@@ -308,6 +308,18 @@ def test_multi_entity_requirements_are_flagged_before_approval(client, llm_mode)
     assert get(client, project)["error"]["code"] == "architecture_unsupported"
 
 
+def test_an_architect_crash_is_flagged_instead_of_hidden(client, llm_mode, monkeypatch):
+    def crash(requirements):
+        raise ValueError("verbatim message AC-17 is not used")
+
+    monkeypatch.setattr(main, "build_architecture", crash)
+    llm_mode(sample("task_manager_en"))
+    project = get(client, create(client))
+    assert project["status"] == "awaiting_approval"
+    assert project["compatibility"]["supported"] is False and project["compatibility"]["message"]
+    assert project["compatibility"]["reasons"] == ["architect_check_failed: ValueError"]
+
+
 # ---------- restart during an analysis ----------
 
 def test_interrupted_analysis_is_recovered_on_startup():

@@ -207,8 +207,14 @@ def requirements_compatibility(requirements):
                        "اطلب تعديلاً لتبسيط المتطلبات قبل الموافقة، وإلا سيتوقف البناء عند مهندس البرمجيات.",
             "reasons": list(exc.reasons),
         }
-    except Exception:  # noqa: BLE001 - a check that cannot run must not block the analysis
-        return None
+    except Exception as exc:  # noqa: BLE001 - an Architect crash must not block the analysis, but must be visible
+        logger.warning("Architect check crashed on requirements under review: %s: %s", type(exc).__name__, str(exc)[:300])
+        return {
+            "supported": False,
+            "message": "تعذّر على مهندس البرمجيات فحص هذه المتطلبات بسبب خطأ داخلي، فقد يتوقف البناء عنده. "
+                       "اطلب تعديلاً بسيطاً أو أبلغ فريق بُنيان.",
+            "reasons": [f"architect_check_failed: {type(exc).__name__}"],
+        }
     return {"supported": True, "message": None, "reasons": []}
 
 
