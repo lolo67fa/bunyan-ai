@@ -221,6 +221,8 @@ def _numbers(text: str) -> List[float]:
     return [float(n) for n in re.findall(r"-?\d+(?:\.\d+)?", text)]
 
 
+_AT_LEAST = re.compile(r"at least|minimum|or more|على الأقل|لا يقل|أو أكثر", re.IGNORECASE)
+_AT_MOST = re.compile(r"at most|maximum|exceed|or less|or fewer|لا يتجاوز|ألا يتجاوز|لا يزيد|ألا يزيد|أو أقل", re.IGNORECASE)
 _WHOLE_NUMBER = re.compile(r"whole number|integer|عدد(?:اً|ا)? صحيح|رقم(?:اً|ا)? صحيح", re.IGNORECASE)
 
 
@@ -229,8 +231,11 @@ def _validation_rules(when: str, message: str, field: Dict[str, Any]) -> List[st
     rules = list(field["messages"].keys())
     if _EMPTY_WORDS.search(when) and "required" in rules:
         return ["required"]
+    v = field["validation"]
     if field["type"] in NUMBER_TYPES and _WHOLE_NUMBER.search(message):
-        return []  # the whole-number check has no message slot in the contract; reported by the caller
+        ranged = [r for r in ("min_value", "max_value") if r in v and float(v[r]) in set(_numbers(message))]
+        # "a whole number from 1 to 5": the range rules carry it; a bare "whole number" has no slot
+        return ranged
     others = [r for r in rules if r != "required"]
     if len(others) == 1:
         return others
@@ -241,6 +246,11 @@ def _validation_rules(when: str, message: str, field: Dict[str, Any]) -> List[st
     named = [r for r in bounds if float(v[r]) in in_message]
     if named:
         return named
+    # "at least two letters" / "must not exceed": the message says which side of the range
+    side = "min_" if _AT_LEAST.search(message) else "max_" if _AT_MOST.search(message) else None
+    sided = [r for r in bounds if side and r.startswith(side)]
+    if len(sided) == 1:
+        return sided
     rule = _validation_rule(when, field)
     return [rule] if rule else []
 
@@ -331,6 +341,11 @@ def _apply_acceptance_criteria(req: Dict[str, Any], doc: Dict[str, Any], warning
         elif cat == "validation":
             rest = re.sub(r"[\"“«]" + re.escape(text) + r"[\"”»]", " ", then)
             named = _fields_named(rest, fields) or _fields_named(when, fields)
+            if not named:  # the message itself names the field: "يجب ألا يتجاوز العنوان 200 حرف"
+                in_text = [f for f in fields if re.search(r"(?<!\w)" + re.escape(f["label"]) + r"(?!\w)", text)]
+                longest = max(in_text, key=lambda f: len(f["label"])) if in_text else None
+                if longest and not any(f is not longest and f["label"] not in longest["label"] for f in in_text):
+                    named = [longest]
             if len(named) > 1 and _EMPTY_WORDS.search(when) and all("required" in f["messages"] for f in named):
                 for f in named:  # "the message 'This field is required' next to each of: A, B, C"
                     put(f"entity.fields.{f['name']}.messages.required", text, ac_id)

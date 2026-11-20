@@ -10,3 +10,4 @@ cp backend/agents/business_analyst/samples/outputs/*.requirements.json backend/a
 `real_llm_inventory_ar.requirements.json` is different: the unedited output of one real
 `claude-opus-5-5` Business Analyst run (GitHub Actions run 44716341099). It keeps the
 regression tests honest about how the model really words validation criteria.
+`real_llm_library_ar.requirements.json`: the same, from run 44769184001 (personal library idea).

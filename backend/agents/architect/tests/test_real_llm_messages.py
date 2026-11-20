@@ -53,3 +53,17 @@ def test_the_template_falls_back_to_the_app_language_for_number_errors():
 
     js = (Path(__file__).resolve().parents[4] / "templates" / "crud" / "app.js").read_text(encoding="utf-8")
     assert "m.invalid||messages.invalid||'Invalid number'" in js
+
+
+def test_second_real_run_messages_that_name_their_field(requirements):
+    """Run 44769184001 (personal library): the message itself names the field, with no 'field' word."""
+    arch = build_architecture(requirements("real_llm_library_ar"))
+    ArchitectureDocument.model_validate(arch)
+    m = fields(arch)
+    assert arch["warnings"] == []  # was 8 unmapped messages
+    assert m["title"]["max_length"] == "يجب ألا يتجاوز العنوان 200 حرف"  # AC-3, the bound in the message
+    assert m["title"]["required"] == "العنوان مطلوب"  # AC-19, the field is cleared
+    assert m["author"]["min_length"] == "يجب أن يكون اسم المؤلف حرفين على الأقل"  # AC-4, "at least"
+    assert m["author"]["max_length"] == "يجب ألا يتجاوز اسم المؤلف 100 حرف"  # AC-5
+    assert m["rating"]["min_value"] == m["rating"]["max_value"] == "يجب أن يكون التقييم عدداً صحيحاً من 1 إلى 5"
+    assert m["read_date"]["date_constraint"] == "لا يمكن أن يكون تاريخ القراءة في المستقبل"  # AC-9
