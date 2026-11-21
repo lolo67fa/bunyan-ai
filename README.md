@@ -1,5 +1,17 @@
 # BUNYAN AI
 
+<p align="center">
+  <img src="docs/images/landing-hero.webp" alt="BUNYAN AI landing page: AI agents that build your app, from Riyadh" width="100%">
+</p>
+
+<table>
+  <tr>
+    <td width="33%"><img src="docs/images/landing-vision.webp" alt="Our vision: anyone with an idea can build the tool they need"></td>
+    <td width="33%"><img src="docs/images/landing-agents.webp" alt="Five specialised agents and one coordination layer"></td>
+    <td width="33%"><img src="docs/images/landing-cta.webp" alt="Every idea deserves a team to build it. BUNYAN is that team."></td>
+  </tr>
+</table>
+
 ### Multi-Agent AI Platform for Building CRUD Web Applications
 
 **Tuwaiq Club — King Saud University**
