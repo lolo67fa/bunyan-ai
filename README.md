@@ -28,7 +28,7 @@
 - [Technology Stack](#technology-stack)
 - [Repository Structure](#repository-structure)
 - [Development Roadmap](#development-roadmap)
-- [Team Members and Responsibilities](#team-members-and-responsibilities)
+- [Team & Contributions](#team--contributions)
 - [Getting Started](#getting-started)
 - [GitHub Collaboration Guidelines](#github-collaboration-guidelines)
 - [Evaluation Criteria](#evaluation-criteria)
@@ -374,18 +374,86 @@ Per-member weekly deliverables are listed in [docs/development-plan.md](docs/dev
 
 ---
 
-## Team Members and Responsibilities
+## Team & Contributions
 
-| Member | AI agent | Technical responsibilities |
-|---|---|---|
-| **Ghala Alshreef** | Business Analyst Agent | Requirements analysis, clarification questions, entities and attributes, user stories and acceptance criteria, CRUD scope control. Team leadership, project coordination, deliverable review. |
-| **Naifah** | Software Architect Agent | Application structure, screens and components, data schema, navigation and behavior, template compatibility. UI/UX design and frontend implementation. |
-| **Yara** | Developer Agent | HTML/CSS/JavaScript generation, CRUD operations, input validation, localStorage persistence, defect fixing. Reusable CRUD template and generation logic. |
-| **Sara** | QA Tester Agent | Test generation from acceptance criteria, Playwright browser tests, CRUD verification, defect reports, QA feedback. Regression and end-to-end testing. |
-| **Jood** | Project Manager Agent | Workflow tracking, output collection, project plan, timeline, risks, status summaries. React frontend development and project dashboard. |
-| **Alanoud** | Backend & Multi-Agent Integration | FastAPI backend, CrewAI orchestration, connecting the five agents, workflow state, frontend–backend integration, API endpoints, GitHub Actions, environment configuration. |
+BUNYAN AI was built by a six-member team at Tuwaiq Club, King Saud University. The table shows what each
+member delivered. These are verified against the Git history, pull requests and deployments in
+[docs/ghala-contribution-audit.md](docs/ghala-contribution-audit.md). The original plan is in
+[docs/team-roles.md](docs/team-roles.md).
 
-Detailed responsibilities and ownership boundaries: [docs/team-roles.md](docs/team-roles.md).
+| Member | Role | Delivered contributions | Pull requests |
+|---|---|---|---|
+| **Ghala Alshreef** | Founder, project lead, Business Analyst, system integration and delivery | Project definition, scope, architecture and team plan. The Business Analyst agent (mock and real Claude modes, requirements contract, live tests with cost controls). The orchestrator that runs the five agents. Integration of every member's component. Backend API extensions (approval flow, artifacts, preview, ZIP), and the React app connected to the real API. Docker image, Railway deployment, CI. Security and guest access. Production fixes. Final release and documentation. | [#1](https://github.com/lolo67fa/bunyan-ai/pull/1), [#2](https://github.com/lolo67fa/bunyan-ai/pull/2), [#6](https://github.com/lolo67fa/bunyan-ai/pull/6), [#8](https://github.com/lolo67fa/bunyan-ai/pull/8), [#15](https://github.com/lolo67fa/bunyan-ai/pull/15), [#16](https://github.com/lolo67fa/bunyan-ai/pull/16) |
+| **Naifah** | Software Architect Agent | Software Architect agent and the `architecture.json` contract (v0.3.0): screens, fields, input controls, validation rules, per-field messages, verbatim acceptance-criteria texts, display formats. | [#4](https://github.com/lolo67fa/bunyan-ai/pull/4) |
+| **Yara** | Developer Agent | Developer agent and the reusable CRUD template (HTML/CSS/JavaScript, localStorage, validation), with its CI smoke test. | [#10](https://github.com/lolo67fa/bunyan-ai/pull/10) |
+| **Sara** | QA Tester Agent | The fixed 8-check Playwright suite, the QA agent (`run_qa`, report validation, quality log) and the `test_report.json` contract (v0.2: verbatim messages, display formats). | [#7](https://github.com/lolo67fa/bunyan-ai/pull/7) |
+| **Jood** | Project Manager Agent and frontend | The React frontend, its alignment with the API, the visual identity and the Riyadh theme (landing page and platform), and the Project Manager agent (`project_plan.md`, `risks.md`). | [#3](https://github.com/lolo67fa/bunyan-ai/pull/3), [#9](https://github.com/lolo67fa/bunyan-ai/pull/9), [#11](https://github.com/lolo67fa/bunyan-ai/pull/11), [#12](https://github.com/lolo67fa/bunyan-ai/pull/12), [#13](https://github.com/lolo67fa/bunyan-ai/pull/13), [#14](https://github.com/lolo67fa/bunyan-ai/pull/14) |
+| **Alanoud** | Backend API | The FastAPI application, Pydantic API contracts, JSON project storage, the Business Analyst endpoint, input validation and the first CI pipeline. | [#5](https://github.com/lolo67fa/bunyan-ai/pull/5) |
+
+Two responsibilities moved during the project. The orchestrator and most of the backend
+integration, first assigned to Alanoud, were delivered by Ghala on top of Alanoud's FastAPI base.
+The frontend, first listed under Naifah, was delivered by Jood.
+
+### Ghala Alshreef — Project Lead, Business Analyst & System Integration
+
+Ghala founded the project and led it from the first commit to the production release. Much of the
+integration and infrastructure work from November 11 onward was implemented with Claude Code, an AI
+coding tool, under her direction. She defined each task, decided scope and trade-offs, approved
+merges, deployments and paid model calls, and verified the results. Those commits carry a
+`Co-Authored-By` trailer. Evidence for every item: [contribution audit](docs/ghala-contribution-audit.md).
+
+1. **Project leadership and planning.**
+   - Created the repository and its foundation documents: problem statement, objectives, CRUD scope and exclusions, the five-agent workflow with a user-approval gate, stack, roadmap, team roles and GitHub rules ([PR #1](https://github.com/lolo67fa/bunyan-ai/pull/1)).
+   - Assigned agent ownership.
+   - Ran the integration-readiness reviews and made the key decisions: integrating all PRs on one branch, adopting Jood's PM agent, adopting the Riyadh identity.
+   - Merged 13 of the 14 merged pull requests.
+2. **Business Analyst development.**
+   - The agent that turns an idea into a validated `requirements.json`: Pydantic contract, Arabic/English and Gulf-dialect handling, CRUD scope guard, entities, functional requirements, user stories, acceptance criteria, clarification questions and revisions after "request changes".
+   - Two modes: deterministic mock, and real Claude (`claude-opus-5-5`) through CrewAI or the Anthropic SDK. One call per analysis, no retries or fallbacks, capped output.
+   - 6,414 lines on `main` and 298 tests ([#2](https://github.com/lolo67fa/bunyan-ai/pull/2), [#8](https://github.com/lolo67fa/bunyan-ai/pull/8), [#15](https://github.com/lolo67fa/bunyan-ai/pull/15)).
+3. **Multi-agent orchestration.** `backend/orchestrator`:
+   - The pipeline from the approved requirements through Architect, Developer, QA and Project Manager, with honest status transitions and error codes.
+   - One QA run at a time, evidence storage and outcome classification (passed / failed / blocked / not run).
+   - Recovery of interrupted projects ([`15f6b9a`](https://github.com/lolo67fa/bunyan-ai/commit/15f6b9a), [`c097bf8`](https://github.com/lolo67fa/bunyan-ai/commit/c097bf8)).
+4. **Agent integration.**
+   - Integrated PRs #4, #5, #7, #8, #9 and #10 into one working branch and resolved their conflicts.
+   - Fixed cross-agent compatibility:
+     - Architect mapping of real LLM validation wording, from 7 and 8 unmapped messages to 0.
+     - QA receives `architecture.json`.
+     - Port and secret isolation for QA.
+   - Wrote an interim Project Manager so the pipeline worked end to end.
+   - Tested Jood's PM independently, merged it unchanged, then added a separate adapter and accuracy fixes (no invented repairs, real QA messages, every QA state, run time 0) ([`92681fb`](https://github.com/lolo67fa/bunyan-ai/commit/92681fb)).
+5. **Backend and frontend integration.**
+   - Approval starts generation.
+   - Artifact, sandboxed preview and ZIP endpoints ([`9636cc5`](https://github.com/lolo67fa/bunyan-ai/commit/9636cc5)).
+   - Connected the React app to the real FastAPI backend with status polling, in Arabic and English ([`a3767a8`](https://github.com/lolo67fa/bunyan-ai/commit/a3767a8)).
+   - Real-LLM analysis states and safe error messages in the UI.
+6. **Testing and QA integration.**
+   - Connected Sara's QA agent to real Playwright runs in the pipeline, including a test that breaks an app on purpose to confirm the suite catches it.
+   - Backend test suites (3,346 lines of `tests/`); CI coverage for the pipeline, QA, security and guest mode.
+   - A browser journey script used locally, in Docker and on the live site.
+   - Acceptance runs in English and Arabic.
+7. **Infrastructure and cloud deployment.**
+   - One Docker image (React build, FastAPI, Node, Playwright Chromium; non-root, health check, persistent `/data` volume) and a hardened Compose file ([`f895495`](https://github.com/lolo67fa/bunyan-ai/commit/f895495)).
+   - The Railway service with its volume, variables and secrets.
+   - Every deployment, with a recorded rollback point; the final release of `main` @ `296099e` (deployment `9e873d4b`).
+8. **Security and guest access.**
+   - Login mode: PBKDF2 logins and per-project ownership (404 for anyone else).
+   - Quotas per user, per address and site-wide; a preview isolated by CSP `sandbox`.
+   - Guest mode: signed anonymous sessions (HMAC, HttpOnly, Secure, SameSite cookies), Origin checks against cross-site writes, limits on new sessions, and paid analysis blocked for anonymous visitors ([`5c79adb`](https://github.com/lolo67fa/bunyan-ai/commit/5c79adb)).
+9. **Production debugging.** Traced a Safari report of raw JSON with garbled Arabic to an HTTP 429 on the homepage in the Railway logs.
+   - The fix: the site always loads; only the API needs a new guest.
+   - Errors now show as an Arabic page in the site theme; JSON uses UTF-8 ([`858ce45`](https://github.com/lolo67fa/bunyan-ai/commit/858ce45), [`7619e18`](https://github.com/lolo67fa/bunyan-ai/commit/7619e18)).
+   - Also fixed QA port collisions in Docker and preview assets blocked by the CSP sandbox.
+10. **GitHub and CI workflow.**
+    - The manual paid-test workflow with a typed confirmation and cost caps; five real-model runs, each approved and recorded.
+    - `ci.yml` extended to the integration and deployment branches.
+    - 33 of the 71 CI runs.
+11. **Final release and delivery.**
+    - The delivery branch, reconciling every team PR (each confirmed fully contained) without rewriting history.
+    - The final PR with green CI ([#16](https://github.com/lolo67fa/bunyan-ai/pull/16)).
+    - The submission documents ([docs/SUBMISSION.md](docs/SUBMISSION.md), [Arabic user guide](docs/user-guide-ar.md), [DEPLOY.md](DEPLOY.md)).
+    - The production release, so that GitHub `main` and Railway run the same code.
 
 ---
 

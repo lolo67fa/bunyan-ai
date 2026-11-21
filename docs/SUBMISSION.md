@@ -200,12 +200,12 @@ in run 44725920842 (the requested supplier-phone field reached the generated app
 
 | Member | Contribution | Pull requests |
 |---|---|---|
-| Ghala Alshreef (lead) | Business Analyst (mock + LLM, contract, revisions, live tests), integration of all branches, orchestrator hand-offs, Docker/Railway, security and guest mode, delivery | #1, #2, #6, #8, #15, integration and delivery branches |
+| Ghala Alshreef (founder, lead) | Project definition and team plan; Business Analyst (mock + LLM, contract, revisions, live tests); the orchestrator; integration of every component; backend API extensions and the frontend–backend connection; Docker, Railway, CI; security and guest mode; production fixes; release and delivery. Evidence: [ghala-contribution-audit.md](ghala-contribution-audit.md) | #1, #2, #6, #8, #15, #16 |
 | Naifah | Software Architect agent and `architecture.json` contract | #4 |
 | Yara | Developer agent and the CRUD template | #10 |
 | Sara | QA Tester: 8-check Playwright suite and `test_report.json` | #7 |
 | Jood | React frontend, Riyadh visual identity and landing page, Project Manager agent | #3, #9, #11, #12, #13, #14 |
-| Alanoud | FastAPI backend integration and API tests | #5 |
+| Alanoud | FastAPI application, API contracts, JSON storage, BA endpoint, input validation, first CI pipeline | #5 |
 
 Every open team PR (#4, #5, #7–#13) is fully contained in the delivery branch (checked with
 `git merge-base --is-ancestor`), so authorship history is preserved. Jood's PM (PR #12, commit
