@@ -30,6 +30,7 @@ import difflib
 import json
 import os
 import re
+import threading
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
@@ -45,6 +46,7 @@ MAX_REPLACE_CHARS = 8_000
 MAX_DIFF_CHARS = 12_000          # stored in repair_history.json
 MAX_OUTPUT_TOKENS = 8_000
 MAX_INPUT_TOKENS = 30_000        # worst case used to reserve the cost
+_one_request_at_a_time = threading.Lock()  # hard concurrency limit for AI repair requests (per server)
 FORBIDDEN = re.compile(
     r"\bfetch\s*\(|XMLHttpRequest|WebSocket|EventSource|sendBeacon|\beval\s*\(|new\s+Function\s*\(|"
     r"\bimport\s*\(|document\.cookie|<script[^>]+src\s*=|<iframe|<object|<embed|https?://",
@@ -214,7 +216,8 @@ def make_llm_repair(owner: Optional[str], client_factory: Optional[Callable[[], 
             raise RepairUnavailable(getattr(exc, "detail", str(exc))) from exc
         message = None
         try:
-            message = call_model(prompt, settings, client_factory() if client_factory else None)
+            with _one_request_at_a_time:
+                message = call_model(prompt, settings, client_factory() if client_factory else None)
         finally:
             usage = getattr(message, "usage", None)
             access.settle(ticket, {"input_tokens": getattr(usage, "input_tokens", None),

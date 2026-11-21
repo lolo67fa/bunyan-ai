@@ -16,7 +16,7 @@ production** until the project lead approves the settings below, stage by stage.
 | Analyses per access code per day | 3 (`BUNYAN_LLM_MAX_PER_CODE_PER_DAY`) | Covers one idea, one clarification and one change request. |
 | AI repairs per access code per day | 3 (`BUNYAN_LLM_REPAIRS_PER_CODE_PER_DAY`) | At most 2 are used per project. |
 | Real analyses, whole site, per day | 10 (`BUNYAN_MAX_LLM_ANALYSES_PER_DAY`, today 0) | Hard cap, independent of the budget. |
-| Concurrent paid requests | 1 (`BUNYAN_MAX_CONCURRENT_ANALYSES=1`) | One at a time. |
+| Concurrent paid requests | 1 analysis (`BUNYAN_MAX_CONCURRENT_ANALYSES=1`) and 1 AI repair (fixed lock) at a time | Bounded load and spend. |
 | Daily budget, whole site | **$3** (`BUNYAN_LLM_DAILY_BUDGET_USD`) | Never exceeded: each request's worst case is reserved under a lock before it is sent. |
 | Monthly cap at Anthropic | $10–20 (set by the lead in the Anthropic Console) | Second, independent limit outside BUNYAN. |
 | Grant lifetime | 12 h (`BUNYAN_LLM_ACCESS_HOURS`) | A code must be re-entered after that. |

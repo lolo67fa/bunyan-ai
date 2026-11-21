@@ -354,3 +354,8 @@ def test_a_second_attempt_builds_on_the_first_ai_fix(tmp_path, authorised, monke
     run(tmp_path, qa, claude)
     second_prompt = claude.requests[1]["messages"][0]["content"]
     assert BUG1 not in second_prompt and BUG2 in second_prompt  # the model sees the already-fixed file
+
+
+def test_ai_repair_requests_run_one_at_a_time():
+    assert llm_repair._one_request_at_a_time.acquire(blocking=False)  # free when idle
+    llm_repair._one_request_at_a_time.release()
