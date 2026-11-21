@@ -77,19 +77,22 @@ defects, files changed with hashes before/after, QA result); the first failing r
 
 ## 5. What is live, what is only in branches
 
-| Capability | Live on Railway (`main` @ `9d22bd8`) | PR `feature/secure-ai-capabilities` (not deployed) |
+Live on Railway: `main` @ `12a0dbf`, the same code as GitHub `main`.
+
+| Capability | In the code | Active on the live site |
 |---|---|---|
 | Five-agent pipeline, preview, ZIP | Yes | Yes |
-| Business Analyst | **mock** for everyone; the protected real analyst is in the code but **off** | same, with audit logs and per-kind limits |
-| Project Manager | **Jood's PM (PR #12)** with the real repair history | same, and it marks AI repairs |
+| Business Analyst | mock, and the protected real analyst (access codes, daily limits, $5 cumulative budget) | **mock only**: protected access off, no budget ledger created |
+| Project Manager | Jood's PM (PR #12) with the real repair history; it marks AI repairs | Yes |
 | Architect mapping of real-LLM wording, `messages.invalid` | Yes | Yes |
-| Repair loop (QA → Developer → QA) | **Yes, deterministic** (`restore`) | same by default; plus the **experimental AI repair** (`llm`), off |
+| Repair loop | deterministic `restore` (default), plus the experimental AI repair (`llm`) | **deterministic only** |
 | Guest mode, isolation, quotas, CSRF check, sandboxed preview, homepage fix | Yes | Yes |
 
-Live deployment: Railway project `bunyan-club-demo`, service `bunyan`, deployment `d0ad75d8`,
-code = `main` @ `9d22bd8`. Variables: `BUNYAN_AUTH=guest`, `BA_MODE=mock`,
-`BUNYAN_MAX_LLM_ANALYSES_PER_DAY=0`, `BUNYAN_LLM_ACCESS` and `BUNYAN_REPAIR` unset (= off and
-`restore`); secrets only in Railway Variables. Rollback: deployment `9e873d4b`.
+Live deployment: Railway project `bunyan-club-demo`, service `bunyan`, deployment `d0d16d96`,
+code = `main` @ `12a0dbf`. Variables: `BUNYAN_AUTH=guest`, `BA_MODE=mock`,
+`BUNYAN_MAX_LLM_ANALYSES_PER_DAY=0`; `BUNYAN_LLM_ACCESS`, `BUNYAN_REPAIR` and
+`BUNYAN_TOTAL_LLM_BUDGET_USD` unset (= off, `restore`, no budget). Secrets only in Railway Variables.
+Rollback: deployment `d0ad75d8`.
 
 ### Protected real Business Analyst (on `main` since PR #17, off by default, not deployed)
 

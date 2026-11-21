@@ -395,8 +395,8 @@ member delivered. These are verified against the Git history, pull requests and 
 
 | Member | Role | Delivered contributions | Pull requests |
 |---|---|---|---|
-| **Ghala Alshreef** | Founder, project lead, Business Analyst, system integration and delivery | Project definition, scope, architecture and team plan. The Business Analyst agent (mock and real Claude modes, requirements contract, live tests with cost controls). The orchestrator that runs the five agents. Integration of every member's component. Backend API extensions (approval flow, artifacts, preview, ZIP), and the React app connected to the real API. Docker image, Railway deployment, CI. Security and guest access. Production fixes. Final release and documentation. After the release: the deterministic repair loop, protected real-BA access, and the integer validation message. | [#1](https://github.com/lolo67fa/bunyan-ai/pull/1), [#2](https://github.com/lolo67fa/bunyan-ai/pull/2), [#6](https://github.com/lolo67fa/bunyan-ai/pull/6), [#8](https://github.com/lolo67fa/bunyan-ai/pull/8), [#15](https://github.com/lolo67fa/bunyan-ai/pull/15), [#16](https://github.com/lolo67fa/bunyan-ai/pull/16), [#17](https://github.com/lolo67fa/bunyan-ai/pull/17), [#18](https://github.com/lolo67fa/bunyan-ai/pull/18) |
-| **Naifah** | Software Architect Agent | Software Architect agent and the `architecture.json` contract (v0.3.0): screens, fields, input controls, validation rules, per-field messages, verbatim acceptance-criteria texts, display formats. | [#4](https://github.com/lolo67fa/bunyan-ai/pull/4) |
+| **Ghala Alshreef** | Founder, project lead, Business Analyst, system integration and delivery | Project definition, scope, architecture and team plan. The Business Analyst agent (mock and real Claude modes, requirements contract, live tests with cost controls). The orchestrator that runs the five agents. Integration of every member's component. Backend API extensions (approval flow, artifacts, preview, ZIP), and the React app connected to the real API. Docker image, Railway deployment, CI. Security and guest access. Production fixes. Final release and documentation. After the release: the deterministic repair loop, protected real-BA access, the integer validation message, an experimental AI repair strategy, and a cumulative AI budget (all paid features off). | [#1](https://github.com/lolo67fa/bunyan-ai/pull/1), [#2](https://github.com/lolo67fa/bunyan-ai/pull/2), [#6](https://github.com/lolo67fa/bunyan-ai/pull/6), [#8](https://github.com/lolo67fa/bunyan-ai/pull/8), [#15](https://github.com/lolo67fa/bunyan-ai/pull/15), [#16](https://github.com/lolo67fa/bunyan-ai/pull/16), [#17](https://github.com/lolo67fa/bunyan-ai/pull/17), [#18](https://github.com/lolo67fa/bunyan-ai/pull/18), [#19](https://github.com/lolo67fa/bunyan-ai/pull/19), [#22](https://github.com/lolo67fa/bunyan-ai/pull/22), [#23](https://github.com/lolo67fa/bunyan-ai/pull/23) |
+| **Naifah** | Software Architect Agent | Software Architect agent and the `architecture.json` contract (v0.3.0): screens, fields, input controls, validation rules, per-field messages, verbatim acceptance-criteria texts, display formats. Open for review: the Bunyan identity for generated apps, and frontend fixes from her identity review. | [#4](https://github.com/lolo67fa/bunyan-ai/pull/4); open: [#20](https://github.com/lolo67fa/bunyan-ai/pull/20), [#21](https://github.com/lolo67fa/bunyan-ai/pull/21) |
 | **Yara** | Developer Agent | Developer agent and the reusable CRUD template (HTML/CSS/JavaScript, localStorage, validation), with its CI smoke test. | [#10](https://github.com/lolo67fa/bunyan-ai/pull/10) |
 | **Sara** | QA Tester Agent | The fixed 8-check Playwright suite, the QA agent (`run_qa`, report validation, quality log) and the `test_report.json` contract (v0.2: verbatim messages, display formats). | [#7](https://github.com/lolo67fa/bunyan-ai/pull/7) |
 | **Jood** | Project Manager Agent and frontend | The React frontend, its alignment with the API, the visual identity and the Riyadh theme (landing page and platform), and the Project Manager agent (`project_plan.md`, `risks.md`). | [#3](https://github.com/lolo67fa/bunyan-ai/pull/3), [#9](https://github.com/lolo67fa/bunyan-ai/pull/9), [#11](https://github.com/lolo67fa/bunyan-ai/pull/11), [#12](https://github.com/lolo67fa/bunyan-ai/pull/12), [#13](https://github.com/lolo67fa/bunyan-ai/pull/13), [#14](https://github.com/lolo67fa/bunyan-ai/pull/14) |
@@ -432,6 +432,11 @@ merges, deployments and paid model calls, and verified the results. Those commit
      - `repair_history.json` and the first failing report are kept.
      - Jood's PM and the Tests view show the real history.
      - No LLM is used ([`f674274`](https://github.com/lolo67fa/bunyan-ai/commit/f674274), [#17](https://github.com/lolo67fa/bunyan-ai/pull/17)).
+   - An experimental **AI repair strategy**, off by default ([`36eec0e`](https://github.com/lolo67fa/bunyan-ai/commit/36eec0e), [#22](https://github.com/lolo67fa/bunyan-ai/pull/22)):
+     - restore runs first;
+     - then one bounded Claude request, only for testers with an access code;
+     - edits are validated (allowlisted files only, no network code, the approved configuration unchanged) before anything is written;
+     - real Chromium re-tests the result.
 4. **Agent integration.**
    - Integrated PRs #4, #5, #7, #8, #9 and #10 into one working branch and resolved their conflicts.
    - Fixed cross-agent compatibility:
@@ -462,6 +467,12 @@ merges, deployments and paid model calls, and verified the results. Those commit
    - Protected real-BA access (off by default): guests stay on the mock analyst; a hashed access code unlocks Claude for one session.
      - Limits checked before any request: per-code and site-wide daily caps, one request at a time, and a daily USD budget that reserves each request's worst case before sending it.
      - The server refuses to start with retries, fallbacks or a larger output cap ([`e29b106`](https://github.com/lolo67fa/bunyan-ai/commit/e29b106)).
+   - A **cumulative experiment budget** for all paid AI ([`563d695`](https://github.com/lolo67fa/bunyan-ai/commit/563d695), [#23](https://github.com/lolo67fa/bunyan-ai/pull/23)):
+     - never reset, kept in integer micro-dollars on the volume;
+     - the worst case is reserved before each request;
+     - fail closed when the ledger is missing or damaged;
+     - an admin-only summary.
+     - The lead approved $5 in total, including an estimated $1.2919 already spent; it is not active in production.
 9. **Production debugging.** Traced a Safari report of raw JSON with garbled Arabic to an HTTP 429 on the homepage in the Railway logs.
    - The fix: the site always loads; only the API needs a new guest.
    - Errors now show as an Arabic page in the site theme; JSON uses UTF-8 ([`858ce45`](https://github.com/lolo67fa/bunyan-ai/commit/858ce45), [`7619e18`](https://github.com/lolo67fa/bunyan-ai/commit/7619e18)).

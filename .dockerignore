@@ -3,6 +3,8 @@
 .github
 **/.env
 **/.env.*
+deploy.env
+**/deploy.env
 !**/.env.example
 **/node_modules
 **/__pycache__
