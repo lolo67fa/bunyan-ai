@@ -57,8 +57,8 @@
 | Five agents + orchestrator | Implemented: Business Analyst → user approval → Architect → Developer → QA (real Playwright, Chromium) → Project Manager → preview and ZIP. |
 | Business Analyst | Two modes. `mock`: deterministic, recognises only the predefined example ideas (task manager, inventory, appointments/bookings…). `llm`: Claude (`claude-opus-5-5`) through the Anthropic SDK, verified with real paid runs (see [docs/SUBMISSION.md](docs/SUBMISSION.md#real-llm-evidence)). The public demo runs `mock`. |
 | Architect, Developer, QA, Project Manager | Deterministic (no LLM): rules, a fixed CRUD template and a fixed 8-check Playwright suite. The PM runs in `mode="rules"`. |
-| Automatic repair loop (QA → Developer) | **Deterministic, at most 2 repairs** (`BUNYAN_REPAIR=restore`): the Developer restores generated files that differ from the approved contracts and QA re-tests in real Chromium; a repair that changes nothing is not re-tested or claimed. No LLM repair. History in `repair_history.json`. (Merged after the live deployment; live shows "not available".) |
-| Protected real Business Analyst | `BUNYAN_LLM_ACCESS=codes`: guests stay on mock; an access code unlocks Claude for one session, with per-code, site-wide and USD-budget limits. Off by default and not enabled on the live site. |
+| Automatic repair loop (QA → Developer) | **Live: deterministic, at most 2 repairs** (`BUNYAN_REPAIR=restore`): the Developer restores generated files that differ from the approved contracts and QA re-tests in real Chromium; a repair that changes nothing is not re-tested or claimed. History in `repair_history.json`. **Experimental, off:** an AI repair strategy (`BUNYAN_REPAIR=llm`) that proposes validated, targeted edits for logic defects, only for authorised testers; tested offline and in real Chromium with a stand-in model, not yet with a paid call. See [docs/AI-RELEASE-PLAN.md](docs/AI-RELEASE-PLAN.md). |
+| Protected real Business Analyst | Implemented, **off in production**: `BUNYAN_LLM_ACCESS=codes` keeps guests on mock; an access code unlocks Claude for one session, with per-code, site-wide, concurrency and daily limits, and a **cumulative experiment budget** (`BUNYAN_TOTAL_LLM_BUDGET_USD`, never reset, fail closed), all checked before each request. Settings and staged release awaiting approval: [docs/AI-RELEASE-PLAN.md](docs/AI-RELEASE-PLAN.md). |
 | Platform | React (Vite) with the Riyadh theme (light/dark, RTL/LTR, desktop/mobile), FastAPI backend. |
 | Deployment | One Docker image; live on Railway in guest mode with signed sessions, per-owner isolation, quotas and a sandboxed preview. |
 
@@ -619,6 +619,7 @@ Results will be recorded with the actual values measured during Week 4 evaluatio
 - [Submission package](docs/SUBMISSION.md)
 - [Arabic user guide](docs/user-guide-ar.md)
 - [Deployment and security](DEPLOY.md)
+- [Secure AI capabilities: settings and staged release](docs/AI-RELEASE-PLAN.md)
 - [System Architecture](docs/architecture.md)
 - [Team Roles and Ownership](docs/team-roles.md)
 - [Four-Week Development Plan](docs/development-plan.md)

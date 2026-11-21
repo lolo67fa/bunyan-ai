@@ -12,7 +12,7 @@ from types import SimpleNamespace
 import pytest
 from fastapi.testclient import TestClient
 
-from backend import llm_access, main, security, storage
+from backend import llm_access, llm_budget, main, security, storage
 from backend.agents.business_analyst import analyst
 from backend.agents.business_analyst.direct_llm import run_direct
 
@@ -62,7 +62,7 @@ def site(monkeypatch):
         "BA_LLM_PROVIDER": "anthropic", "BA_LLM_MODEL": "claude-opus-5-5", "BA_LLM_BACKEND": "direct",
         "BA_MAX_RETRIES": "0", "BA_SDK_MAX_RETRIES": "0", "BA_FALLBACKS": "off", "BA_MAX_TOKENS": "32000",
         "ANTHROPIC_API_KEY": "sk-ant-offline-test-value-never-sent",
-        "BUNYAN_LLM_DAILY_BUDGET_USD": "2", "BUNYAN_LLM_MAX_PER_CODE_PER_DAY": "3",
+        "BUNYAN_LLM_DAILY_BUDGET_USD": "2", "BUNYAN_LLM_MAX_PER_CODE_PER_DAY": "3", "BUNYAN_TOTAL_LLM_BUDGET_USD": "5.00", "BUNYAN_LLM_BUDGET_STARTING_SPENT_USD": "0",
         "BUNYAN_MAX_PROJECTS_PER_USER_PER_DAY": "10",
     }
     for k, v in env.items():
@@ -199,3 +199,34 @@ def test_guest_mode_still_refuses_a_global_real_analyst(site, monkeypatch):
     with pytest.raises(RuntimeError, match="BA_MODE=mock"):
         with TestClient(main.app):
             pass
+
+
+def test_clarification_round_with_the_real_analyst(site, monkeypatch):
+    """The model asks questions, the tester answers, the model is called again; both calls count."""
+    samples = ROOT / "backend/agents/business_analyst/samples/outputs"
+    texts = [(samples / "vague_idea_en.requirements.json").read_text(encoding="utf-8"),
+             (samples / "task_manager_en.requirements.json").read_text(encoding="utf-8")]
+    calls = []
+
+    class Sequenced(StandInAnthropic):
+        def _stream(self, **request):
+            calls.append(request)
+            message = SimpleNamespace(stop_reason="end_turn", stop_details=None, _request_id="req_offline",
+                                      model="claude-opus-5-5", usage=SimpleNamespace(input_tokens=6000, output_tokens=9000),
+                                      content=[SimpleNamespace(type="text", text=texts[len(calls) - 1])])
+            return _Ctx(message)
+
+    fake = Sequenced()
+    monkeypatch.setattr(analyst, "_default_llm_generator", lambda d, s: run_direct(d, s, client=fake))
+    alice = browser()
+    unlock(alice)
+    pid = alice.post("/projects", json={"prompt": "I want an app to keep track of my work stuff and things"}).json()["project_id"]
+    project = alice.get(f"/projects/{pid}").json()
+    assert project["status"] == "awaiting_clarification" and project["analysis"]["mode"] == "llm"
+    questions = project["requirements"]["clarification_questions"]
+    answers = {q["id"]: (q.get("suggested_default") or "Tasks with title, due date, priority and status") for q in questions}
+    assert alice.post(f"/projects/{pid}/answers", json={"answers": answers}).status_code == 200
+    project = alice.get(f"/projects/{pid}").json()
+    assert project["status"] == "awaiting_approval" and len(calls) == 2
+    assert alice.get("/llm-access").json()["remaining_today"] == 1  # both analyses counted on the code
+    assert spent()["spent_usd"] == pytest.approx(2 * (6000 * 4 / 1e6 + 9000 * 20 / 1e6))

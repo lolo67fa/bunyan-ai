@@ -187,8 +187,9 @@ def plan_markdown(f: Facts, stages: List[Stage], risks: List[Risk], summary: str
             files = ", ".join(c.get("file", "") for c in step.get("changed_files") or [])
             n = step.get("attempt")
             if step.get("result") == "changed":
-                lines.append(_t(L, f"  - المحاولة {n}: غيّر المطوّر {files}، ثم أُعيدت الفحوصات.",
-                                f"  - Attempt {n}: the Developer changed {files}; the checks ran again."))
+                ai = step.get("strategy") == "llm_repair"
+                lines.append(_t(L, f"  - المحاولة {n}: غيّر المطوّر {files}{' (إصلاح بالذكاء الاصطناعي)' if ai else ''}، ثم أُعيدت الفحوصات.",
+                                f"  - Attempt {n}: the Developer changed {files}{' (AI repair)' if ai else ''}; the checks ran again."))
             elif step.get("result") == "no_change":
                 lines.append(_t(L, f"  - المحاولة {n}: لم يتغير أي ملف، فلم تُعَد الفحوصات ولا يُحسب إصلاحاً.",
                                 f"  - Attempt {n}: no file changed, so the checks were not re-run and it does not count as a repair."))
