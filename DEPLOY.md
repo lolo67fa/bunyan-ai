@@ -92,6 +92,16 @@ each request reserves its worst case, 0.72 USD, before it is sent, then books th
 The server refuses to start with a weaker setting. Visitors without a code keep the mock analyst.
 Also set a monthly spend limit for the key's workspace in the Anthropic Console.
 
+### Cumulative experiment budget (required with access codes)
+
+`BUNYAN_TOTAL_LLM_BUDGET_USD` (for example `5.00`) is the total for the whole experiment, across analyses and AI repairs. It is never reset. `BUNYAN_LLM_BUDGET_STARTING_SPENT_USD` must also be set: what was already spent, decided by the lead. Without either variable, paid requests are refused.
+
+The ledger is `/data/llm_budget.json` (keep the volume). Do not delete it or `llm_budget.initialized`; a missing or damaged ledger blocks paid requests until a person fixes it. Optional:
+- `BUNYAN_LLM_MAX_ANALYSES_PER_CODE_TOTAL`: a per-code cap for the experiment;
+- `BUNYAN_ADMINS=ghala`, for `GET /admin/llm-budget` with that user's login.
+
+Details: [docs/AI-RELEASE-PLAN.md](docs/AI-RELEASE-PLAN.md).
+
 ## Repair loop
 
 `BUNYAN_REPAIR=restore` (default) runs at most two deterministic repairs with a real QA re-test after
