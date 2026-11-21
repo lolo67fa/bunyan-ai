@@ -26,12 +26,13 @@ def test_real_llm_validation_messages_are_mapped(requirements):
     assert sources["entity.fields.name.messages.min_length"] == "AC-3"
 
 
-def test_the_unsupported_whole_number_message_is_reported_not_dropped(requirements):
-    warnings = build_architecture(requirements("real_llm_inventory_ar"))["warnings"]
-    not_tied = [w for w in warnings if "not tied to one field rule" in w]
-    assert not_tied == []  # was 7 before the fix
-    whole = [w for w in warnings if w.startswith("AC-6 ")]
-    assert len(whole) == 1 and "يجب أن تكون الكمية عدداً صحيحاً" in whole[0] and "no message slot" in whole[0]
+def test_the_whole_number_message_goes_to_the_invalid_slot(requirements):
+    arch = build_architecture(requirements("real_llm_inventory_ar"))
+    assert arch["warnings"] == []  # was 7 unmapped messages, then 1 (no slot for it)
+    quantity = next(f for f in arch["entity"]["fields"] if f["name"] == "quantity")
+    assert quantity["messages"]["invalid"] == "يجب أن تكون الكمية عدداً صحيحاً"  # AC-6, exact text
+    assert {"path": "entity.fields.quantity.messages.invalid", "text": "يجب أن تكون الكمية عدداً صحيحاً",
+            "source": "AC-6"} in arch["verbatim_messages"]
 
 
 def test_an_unquoted_word_in_a_sentence_still_does_not_name_a_field(requirements):
@@ -65,5 +66,6 @@ def test_second_real_run_messages_that_name_their_field(requirements):
     assert m["title"]["required"] == "العنوان مطلوب"  # AC-19, the field is cleared
     assert m["author"]["min_length"] == "يجب أن يكون اسم المؤلف حرفين على الأقل"  # AC-4, "at least"
     assert m["author"]["max_length"] == "يجب ألا يتجاوز اسم المؤلف 100 حرف"  # AC-5
-    assert m["rating"]["min_value"] == m["rating"]["max_value"] == "يجب أن يكون التقييم عدداً صحيحاً من 1 إلى 5"
+    rating = "يجب أن يكون التقييم عدداً صحيحاً من 1 إلى 5"
+    assert m["rating"]["min_value"] == m["rating"]["max_value"] == m["rating"]["invalid"] == rating
     assert m["read_date"]["date_constraint"] == "لا يمكن أن يكون تاريخ القراءة في المستقبل"  # AC-9

@@ -333,6 +333,19 @@
           ],
           "default": null,
           "title": "Date Constraint"
+        },
+        "invalid": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional (added in v0.3.2, backwards compatible). Number and select fields only: shown when the value is not a valid number (e.g. 2.5 in an integer field) or not one of the options. Without it the app shows the screen-level messages.invalid.",
+          "title": "Invalid"
         }
       },
       "title": "FieldMessages",

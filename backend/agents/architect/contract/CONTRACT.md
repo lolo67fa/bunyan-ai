@@ -5,6 +5,15 @@
 **Consumers:** Yara (Developer / CRUD template), Sara (fixed QA suite), Jood (frontend + PM agent), Alanoud (orchestrator)
 **Source of truth:** [`../schema.py`](../schema.py) (Pydantic). [`architecture.schema.proposal.json`](architecture.schema.proposal.json) is generated from it; do not edit by hand.
 
+### Addition in v0.3.2 (backwards compatible; `schema_version` stays `0.3.0-proposal`)
+
+| Change | Details |
+|---|---|
+| New optional `fields[].messages.invalid` | Number (`integer`, `decimal`) and `enum` fields only. The text shown when the value is not a valid number (e.g. `2.5` in an integer field) or not one of the options. It is not tied to a `validation` rule (the input type enforces it), so it is never required; on any other field type the document is rejected. Without it the app shows the screen-level `messages.invalid`, in the app language. |
+| Architect | A validation criterion on an integer field that quotes a whole-number message ("must be a whole number", "عدداً صحيحاً") sets `messages.invalid` verbatim (rule M1, listed in `verbatim_messages`). If the same message names a range ("عدداً صحيحاً من 1 إلى 5"), it also sets `min_value`/`max_value`. |
+| Validation wording | Field names are recognised when quoted, after the word field/حقل, as "X field", or inside the message itself; one "required" message next to several fields applies to each; a message naming both bounds sets both rules; "at least"/"must not exceed" choose the side. Messages that still cannot be mapped are reported in `warnings`, never dropped silently. |
+| Consumers | Developer/template: already reads `m.invalid`, then `messages.invalid` (no code change needed beyond the fallback). QA: unchanged. Documents written before v0.3.2 stay valid. |
+
 ### Fix in v0.3.1 (integration review before merge)
 
 | Problem | Fix |

@@ -352,15 +352,12 @@ def _apply_acceptance_criteria(req: Dict[str, Any], doc: Dict[str, Any], warning
                 continue
             field = max(named, key=lambda f: len(f["label"])) if named else None
             rules = _validation_rules(when, text, field) if field else []
+            whole = bool(field) and field["type"] == "integer" and bool(_WHOLE_NUMBER.search(text))
+            if whole:  # "must be a whole number": the message for a fraction in this integer field
+                rules = rules + ["invalid"]
             for rule in rules:
                 put(f"entity.fields.{field['name']}.messages.{rule}", text, ac_id)
-            if field and not rules and field["type"] in NUMBER_TYPES and _WHOLE_NUMBER.search(text):
-                warnings.append(
-                    f"{ac_id} quotes the message “{text}” for the whole-number check of '{field['name']}', but the "
-                    "architecture contract has no message slot for that check (fields[].messages has no 'invalid'); "
-                    "the form still refuses the value, with the template's generic number error"
-                )
-            elif not rules:
+            if not rules:
                 warnings.append(
                     f"{ac_id} quotes the message “{text}” but it is not tied to one field rule (likely a business "
                     "rule such as no double booking); the MVP template cannot show it"
