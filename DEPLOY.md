@@ -97,6 +97,13 @@ Also set a monthly spend limit for the key's workspace in the Anthropic Console.
 `BUNYAN_REPAIR=restore` (default) runs at most two deterministic repairs with a real QA re-test after
 each real change; `off` disables it. No LLM and no cost.
 
+`BUNYAN_REPAIR=llm` (experimental, needs `BUNYAN_LLM_ACCESS=codes`): restore first, then, for a
+project whose owner entered an access code, one bounded Claude request proposes find/replace edits
+to `index.html`, `style.css` or `app.js` only; they are validated before anything is written and QA
+re-tests in Chromium. Limit: `BUNYAN_LLM_REPAIRS_PER_CODE_PER_DAY` (3), the same daily USD budget,
+and `BUNYAN_LLM_REPAIR_TIMEOUT` seconds per request (120). Settings, procedures and staged release:
+[docs/AI-RELEASE-PLAN.md](docs/AI-RELEASE-PLAN.md).
+
 ## Switching on the real Business Analyst
 
 Set `BA_MODE=llm`, `BA_LLM_PROVIDER=anthropic`, `BA_LLM_MODEL=claude-opus-5-5`,
