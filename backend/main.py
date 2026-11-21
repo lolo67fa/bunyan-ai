@@ -72,6 +72,18 @@ _running_lock = threading.Lock()
 _running_projects = set()
 
 
+def check_repair_configuration():
+    """BUNYAN_REPAIR: restore (default), llm (needs the protected real analyst) or off."""
+    from backend.agents.developer import llm_repair
+
+    mode = os.environ.get("BUNYAN_REPAIR", "restore").strip().lower()
+    if mode not in ("restore", "llm", "off", "0", "false", "no"):
+        raise RuntimeError("BUNYAN_REPAIR must be 'restore', 'llm' or 'off'")
+    llm_repair.check_configuration()
+    logger.info("Repair loop: %s", {"restore": "deterministic (restore_from_contracts)",
+                                    "llm": "restore, then AI repair for authorised testers"}.get(mode, "off"))
+
+
 def check_ba_configuration():
     """Validate the Business Analyst settings once at startup.
 
@@ -99,6 +111,7 @@ async def lifespan(app):
     security.check_configuration()
     check_ba_configuration()
     llm_access.check_configuration()
+    check_repair_configuration()
     recover_interrupted_projects()
     yield
 

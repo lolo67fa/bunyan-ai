@@ -36,7 +36,7 @@ from backend.orchestrator.qa_stage import (
 
 REPAIR_HISTORY_FILE = "repair_history.json"
 INITIAL_REPORT_FILE = "test_report.initial.json"
-REPAIR_ENV_VAR = "BUNYAN_REPAIR"  # "restore" (default) or "off"
+REPAIR_ENV_VAR = "BUNYAN_REPAIR"  # "restore" (default), "llm" (authorised testers, see llm_repair.py) or "off"
 RepairStrategy = Callable[[Dict[str, Any], Dict[str, Any], Path, List[Dict[str, Any]], int], Any]
 
 REQUIREMENTS_FILE = "requirements.json"
@@ -126,7 +126,7 @@ def run_pipeline(
     if qa_runner is None and _qa_enabled():
         qa_runner = run_qa
     if repair is None and _repair_enabled():
-        repair = restore_from_contracts
+        repair = _default_repair(project)
     project["repair_attempt"] = 0
     project["repair"] = None
 
@@ -296,12 +296,17 @@ def _repair_loop(project, on_update, workdir, app_dir, requirements, architectur
             history.append({"attempt": attempt, "step": "repair", "result": "invalid_output", "reason": bad.message})
             state["stopped"] = "invalid_repair_output"
             break
-        except Exception as exc:
-            history.append({"attempt": attempt, "step": "repair", "result": "error", "reason": _describe(exc)})
-            state["stopped"] = "repair_error"
+        except Exception as exc:  # RepairRejected / RepairUnavailable carry their own stop reason
+            stop = getattr(exc, "stop_reason", "repair_error")
+            history.append({"attempt": attempt, "step": "repair", "result": "rejected" if stop == "invalid_repair_output"
+                            else "unavailable" if stop == "repair_unavailable" else "error", "reason": _describe(exc)})
+            state["stopped"] = stop
             break
         entry = {"attempt": attempt, "step": "repair", "strategy": change.strategy, "defects": change.defects,
                  "changed_files": changed, "result": "changed" if changed else "no_change"}
+        details = getattr(change, "details", None)
+        if details:
+            entry.update(details)  # AI repair: diagnosis, the diff that was applied, number of edits
         history.append(entry)
         if not changed:
             state["stopped"] = "no_change"  # nothing to re-test, and no repair is claimed
@@ -334,8 +339,23 @@ def _qa_entry(report: Dict[str, Any], qa: Dict[str, Any]) -> Dict[str, Any]:
     return {"status": qa["status"], "passed": s["passed"], "total": s["total"], "failed": failed}
 
 
+def _repair_mode() -> str:
+    mode = os.environ.get(REPAIR_ENV_VAR, "restore").strip().lower()
+    return "off" if mode in ("off", "0", "false", "no") else mode
+
+
 def _repair_enabled() -> bool:
-    return os.environ.get(REPAIR_ENV_VAR, "restore").strip().lower() not in ("off", "0", "false", "no")
+    return _repair_mode() != "off"
+
+
+def _default_repair(project: dict) -> RepairStrategy:
+    """restore (default) for everyone; with BUNYAN_REPAIR=llm, restore first and then an AI repair,
+    which runs only for an owner who unlocked the protected real analyst (checked at repair time)."""
+    if _repair_mode() == "llm":
+        from backend.agents.developer.llm_repair import make_llm_repair
+
+        return make_llm_repair(project.get("owner"))
+    return restore_from_contracts
 
 
 def _qa_enabled() -> bool:
