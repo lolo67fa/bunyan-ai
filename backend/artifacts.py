@@ -24,6 +24,8 @@ ARTIFACT_PATHS = {
     "test_report.json": "test_report.json",
     "project_plan.md": "project_plan.md",
     "risks.md": "risks.md",
+    "repair_history.json": "repair_history.json",         # only when the repair loop ran
+    "test_report.initial.json": "test_report.initial.json",  # the first QA report, kept when a repair followed
 }
 
 # The generated application: the only files the preview serves.

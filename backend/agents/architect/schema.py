@@ -86,6 +86,12 @@ class FieldMessages(_Model):
     max_value: Optional[str] = None
     pattern: Optional[str] = None
     date_constraint: Optional[str] = None
+    invalid: Optional[str] = Field(
+        default=None,
+        description="Optional (added in v0.3.2, backwards compatible). Number and select fields only: shown "
+        "when the value is not a valid number (e.g. 2.5 in an integer field) or not one of the options. "
+        "Without it the app shows the screen-level messages.invalid.",
+    )
 
 
 class DisplayFormat(_Model):
@@ -170,6 +176,10 @@ class FieldSpec(_Model):
         if self.unique:
             active.add("unique")
         given = {k for k, val in self.messages.model_dump().items() if val}
+        # 'invalid' is optional and not tied to a validation rule: the input type itself enforces it
+        if "invalid" in given and self.type not in NUMBER_TYPES | {"enum"}:
+            raise ValueError(f"field '{n}': messages.invalid is only allowed on number and enum fields")
+        given.discard("invalid")
         if active - given:
             raise ValueError(f"field '{n}' is missing messages for {sorted(active - given)}")
         if given - active:

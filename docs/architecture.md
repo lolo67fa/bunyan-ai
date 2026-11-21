@@ -70,18 +70,20 @@ The Business Analyst Agent verifies that the idea fits the CRUD scope. Requests 
 
 The workflow pauses after requirements are generated. Nothing is designed or generated until the user approves the requirements. If the user requests changes, the Business Analyst Agent revises `requirements.json` before continuing.
 
-### 3.3 QA ↔ Developer repair loop
+### 3.3 QA ↔ Developer repair loop (implemented: `backend/orchestrator/pipeline.py`, `backend/agents/developer/repair.py`)
 
 ```
-Developer ──code──► QA Tester ──all tests pass──► Project Manager
-    ▲                   │
-    └──failure report───┘   (attempts 1 and 2 only)
+Developer ──code──► QA Tester (attempt 0) ──all pass──► Project Manager
+    ▲                   │ failed: real defects
+    └── repair ◄────────┘   only a repair that changed files is re-tested (attempts 1 and 2)
 ```
 
-- After the initial generation, QA runs the tests.
-- On failure, QA sends a concise failure report (failing test, expected vs. actual behavior, error messages) to the Developer Agent.
-- At most **two** repair attempts are made.
-- If failures remain, the workflow continues; the final `test_report.json` records the real results and the Project Manager Agent records the open defects as risks.
+- Strategy `restore_from_contracts` (deterministic, no LLM): regenerate from the approved contracts and
+  replace every generated file that differs. No change → stop, no re-test, nothing claimed.
+- At most **two** repairs. QA blocked on a re-test fails the run with its reason.
+- Artifacts: `repair_history.json` (every step), `test_report.initial.json` (first failing report),
+  `test_report.json` (last real report). The PM receives the history (`repair_history` input).
+- `BUNYAN_REPAIR=restore` (default) or `off`. An LLM repair strategy is not implemented.
 
 ## 4. Artifacts
 

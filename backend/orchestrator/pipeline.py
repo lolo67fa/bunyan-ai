@@ -3,7 +3,10 @@
 This module does not know about FastAPI or backend storage. The caller passes the
 project dict, the folder to write into, and a callback that persists the project.
 
-Not included yet: the repair loop.
+Repair loop (BUNYAN_REPAIR, default "restore"): when QA finds defects, the Developer repairs
+the app and QA re-tests it in a real browser, at most MAX_REPAIRS times. Only a repair that really
+changed a file is followed by a re-test and counted; the history is saved as repair_history.json.
+The only strategy is deterministic ("restore_from_contracts", no LLM); see backend/agents/developer/repair.py.
 """
 
 from __future__ import annotations
@@ -16,6 +19,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 from backend.agents.architect import ArchitectureError, build_architecture
 from backend.agents.developer import DeveloperError, generate
+from backend.agents.developer.repair import MAX_REPAIRS, restore_from_contracts
 from backend.agents.project_manager import OUTPUT_FILES, run_project_manager, write_outputs
 
 PLAN_FILE, RISKS_FILE = OUTPUT_FILES
@@ -29,6 +33,11 @@ from backend.orchestrator.qa_stage import (
     metrics_from_report,
     run_qa_stage,
 )
+
+REPAIR_HISTORY_FILE = "repair_history.json"
+INITIAL_REPORT_FILE = "test_report.initial.json"
+REPAIR_ENV_VAR = "BUNYAN_REPAIR"  # "restore" (default) or "off"
+RepairStrategy = Callable[[Dict[str, Any], Dict[str, Any], Path, List[Dict[str, Any]], int], Any]
 
 REQUIREMENTS_FILE = "requirements.json"
 ARCHITECTURE_FILE = "architecture.json"
@@ -65,6 +74,7 @@ def run_pipeline(
     on_update: Callable[[dict], None],
     *,
     qa_runner: Optional[QaRunner] = None,
+    repair: Optional[RepairStrategy] = None,
 ) -> dict:
     """Run Architect, Developer and QA for one approved project and store the files.
 
@@ -115,6 +125,10 @@ def run_pipeline(
     project["artifacts"] = []
     if qa_runner is None and _qa_enabled():
         qa_runner = run_qa
+    if repair is None and _repair_enabled():
+        repair = restore_from_contracts
+    project["repair_attempt"] = 0
+    project["repair"] = None
 
     try:
         requirements = _checked_requirements(project.get("requirements"))
@@ -134,6 +148,9 @@ def run_pipeline(
         else:
             _update(project, on_update, workdir, status="testing", current_agent="qa_tester")
             qa_report = _test(project, workdir, app_dir, qa_runner, started)
+            if repair is not None:
+                qa_report = _repair_loop(project, on_update, workdir, app_dir, requirements, architecture,
+                                         qa_runner, repair, qa_report, started)
 
         _update(project, on_update, workdir, status="documenting", current_agent="project_manager")
         _document(project, workdir, requirements, architecture, qa_report)
@@ -185,10 +202,12 @@ def _develop(requirements: Dict[str, Any], architecture: Dict[str, Any], app_dir
         raise _StageFailure("generation_failed", f"Developer failed: {_describe(exc)}") from exc
 
 
-def _test(project: dict, workdir: Path, app_dir: Path, qa_runner: QaRunner, started: float) -> Dict[str, Any]:
+def _test(project: dict, workdir: Path, app_dir: Path, qa_runner: QaRunner, started: float,
+          attempt: int = 0) -> Dict[str, Any]:
     """Run QA, store its report and put the real numbers on the project. Returns the report."""
     try:
-        result = run_qa_stage(workdir, app_dir, workdir / REQUIREMENTS_FILE, qa_runner, workdir / ARCHITECTURE_FILE)
+        result = run_qa_stage(workdir, app_dir, workdir / REQUIREMENTS_FILE, qa_runner, workdir / ARCHITECTURE_FILE,
+                              attempt=attempt)
     except QaBlocked as blocked:
         project["qa"] = {"status": QA_BLOCKED, "reason": blocked.message}
         if blocked.report is not None:
@@ -225,7 +244,9 @@ def _document(
                 "qa": project.get("qa"),
                 "generated_files": [name for name in APP_FILES if _is_real_file(workdir / APP_DIRNAME / name)],
                 "repair_attempt": project.get("repair_attempt") or 0,
-                "repair_loop_available": False,  # no repair strategy exists yet: never claim one
+                # True only when this run really had a repair loop (QA ran and BUNYAN_REPAIR is on)
+                "repair_loop_available": bool(project.get("repair")),
+                "repair_history": project.get("repair"),
                 "run_time_seconds": (project.get("metrics") or {}).get("run_time_seconds"),
             },
             mode="rules",  # the pipeline never makes a paid call for the documents
@@ -238,6 +259,83 @@ def _document(
     missing = [name for name in (PLAN_FILE, RISKS_FILE) if not _is_real_file(workdir / name)]
     if missing:
         raise _StageFailure("documentation_failed", f"Project documents are missing or empty: {', '.join(missing)}")
+
+
+def _repair_loop(project, on_update, workdir, app_dir, requirements, architecture, qa_runner, repair,
+                 report, started) -> Dict[str, Any]:
+    """Developer -> QA re-test, at most MAX_REPAIRS times. Returns the last real QA report.
+
+    Stops when QA passes, when the repair changed nothing (no re-test, nothing claimed), when the
+    repair output is invalid, or when the budget is used. QA blocked on a re-test fails the run as usual.
+    """
+    first = project["qa"]
+    history: List[Dict[str, Any]] = [{"attempt": 0, "step": "test", "qa": _qa_entry(report, first)}]
+    state = {"available": True, "max_repairs": MAX_REPAIRS, "strategy": getattr(repair, "__name__", "custom"),
+             "history": history, "stopped": None}
+    project["repair"] = state
+
+    def save():
+        _write_json(workdir / REPAIR_HISTORY_FILE, state)
+
+    save()
+    if first["status"] != "failed":
+        state["stopped"] = "passed"
+        save()
+        return report
+    _write_json(workdir / INITIAL_REPORT_FILE, report)  # the original failure report is never overwritten
+    for attempt in range(1, MAX_REPAIRS + 1):
+        _update(project, on_update, workdir, status="repairing", current_agent="developer")
+        defects = [d for d in (report.get("defects") or []) if isinstance(d, dict)]
+        if not defects:
+            defects = [{"check_id": c, "message": "failed"} for c in project["qa"].get("failed_checks", [])]
+        try:
+            change = repair(requirements, architecture, app_dir, defects, attempt)
+            changed = list(change.changed_files)
+            _check_outputs(workdir)
+        except _StageFailure as bad:
+            history.append({"attempt": attempt, "step": "repair", "result": "invalid_output", "reason": bad.message})
+            state["stopped"] = "invalid_repair_output"
+            break
+        except Exception as exc:
+            history.append({"attempt": attempt, "step": "repair", "result": "error", "reason": _describe(exc)})
+            state["stopped"] = "repair_error"
+            break
+        entry = {"attempt": attempt, "step": "repair", "strategy": change.strategy, "defects": change.defects,
+                 "changed_files": changed, "result": "changed" if changed else "no_change"}
+        history.append(entry)
+        if not changed:
+            state["stopped"] = "no_change"  # nothing to re-test, and no repair is claimed
+            break
+        project["repair_attempt"] = attempt
+        _update(project, on_update, workdir, status="testing", current_agent="qa_tester")
+        try:
+            report = _test(project, workdir, app_dir, qa_runner, started, attempt=attempt)
+        except _StageFailure:
+            history.append({"attempt": attempt, "step": "test", "qa": {"status": "blocked", "reason": project["qa"].get("reason")}})
+            state["stopped"] = "qa_blocked"
+            save()
+            raise
+        history.append({"attempt": attempt, "step": "test", "qa": _qa_entry(report, project["qa"])})
+        save()
+        if project["qa"]["status"] != "failed":
+            state["stopped"] = "passed"
+            break
+    else:
+        state["stopped"] = "budget_used"
+    save()
+    return report
+
+
+def _qa_entry(report: Dict[str, Any], qa: Dict[str, Any]) -> Dict[str, Any]:
+    failed = [{"check_id": c["id"], "message": ((c.get("error") or {}).get("message") or "").splitlines()[0][:300]
+               if (c.get("error") or {}).get("message") else ""}
+              for c in report.get("checks", []) if c.get("status") == "failed"]
+    s = report["summary"]
+    return {"status": qa["status"], "passed": s["passed"], "total": s["total"], "failed": failed}
+
+
+def _repair_enabled() -> bool:
+    return os.environ.get(REPAIR_ENV_VAR, "restore").strip().lower() not in ("off", "0", "false", "no")
 
 
 def _qa_enabled() -> bool:
@@ -274,7 +372,7 @@ def _is_real_file(path: Path) -> bool:
 def _artifacts(workdir: Path) -> List[Dict[str, Any]]:
     """Files that exist right now, in the shape the frontend reads: {"name", "available"}."""
     found = []
-    for rel in _expected_files() + [TEST_REPORT_FILE, PLAN_FILE, RISKS_FILE]:
+    for rel in _expected_files() + [TEST_REPORT_FILE, PLAN_FILE, RISKS_FILE, REPAIR_HISTORY_FILE, INITIAL_REPORT_FILE]:
         if _is_real_file(workdir / rel):
             found.append({"name": Path(rel).name, "available": True, "path": rel})
     return found

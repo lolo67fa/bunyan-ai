@@ -100,9 +100,13 @@ def _qa_lock():
 
 
 def run_qa_stage(
-    workdir: Path, app_dir: Path, requirements_path: Path, runner: QaRunner, architecture_path: Optional[Path] = None
+    workdir: Path, app_dir: Path, requirements_path: Path, runner: QaRunner, architecture_path: Optional[Path] = None,
+    attempt: int = 0,
 ) -> QaResult:
-    """Run QA once (attempt 0) and return its outcome. Raises ``QaBlocked``.
+    """Run QA once and return its outcome. Raises ``QaBlocked``.
+
+    ``attempt`` is 0 for the first run and 1 or 2 for the re-test after a repair; the report
+    must carry the same number (a report from another run is refused).
 
     With ``architecture_path``, QA v0.2 also compares the exact texts the Architect chose
     (button labels, required-field and delete-confirmation messages, number formats).
@@ -110,7 +114,7 @@ def run_qa_stage(
     workdir = Path(workdir)
     with _qa_lock():
         try:
-            report = runner(app_dir, requirements_path, attempt=0, architecture_path=architecture_path)
+            report = runner(app_dir, requirements_path, attempt=attempt, architecture_path=architecture_path)
         except subprocess.TimeoutExpired as exc:
             raise QaBlocked("qa_failed", f"QA did not finish within {int(exc.timeout)} seconds") from exc
         except Exception as exc:
@@ -127,6 +131,8 @@ def run_qa_stage(
         QAReport.model_validate(report)
     except Exception as exc:
         raise QaBlocked("qa_failed", "QA report does not match the agreed format") from exc
+    if (report.get("run") or {}).get("attempt") != attempt:
+        raise QaBlocked("qa_failed", f"QA report is for attempt {report['run'].get('attempt')}, expected {attempt}")
     return _classify(report)
 
 

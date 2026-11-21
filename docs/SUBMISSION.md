@@ -28,8 +28,8 @@ multi-entity apps, server-side databases, logins inside the generated app, payme
 | # | Agent | Input → output | How it works in this delivery | Owner |
 |---|---|---|---|---|
 | 1 | Business Analyst | idea (+ answers, + change requests) → `requirements.json` | `llm` mode: Claude `claude-opus-5-5` with a strict Pydantic contract and validation. `mock` mode: deterministic, for the predefined example ideas only. Asks clarification questions, refuses out-of-scope ideas, revises after "request changes". | Ghala |
-| 2 | Software Architect | approved requirements → `architecture.json` (contract v0.3.1) | Deterministic. Screens, fields, input controls, validation rules and every error message; messages quoted in acceptance criteria are copied verbatim. | Naifah |
-| 3 | Developer | requirements + architecture → `index.html`, `style.css`, `app.js` | Deterministic: a tested CRUD template filled with escaped JSON (no `innerHTML`), RTL/LTR, localStorage. | Yara |
+| 2 | Software Architect | approved requirements → `architecture.json` (contract v0.3.1; v0.3.2 adds the optional `messages.invalid`) | Deterministic. Screens, fields, input controls, validation rules and every error message; messages quoted in acceptance criteria are copied verbatim. | Naifah |
+| 3 | Developer | requirements + architecture (+ QA defects) → `index.html`, `style.css`, `app.js` | Deterministic: a tested CRUD template filled with escaped JSON (no `innerHTML`), RTL/LTR, localStorage. Repair (`restore_from_contracts`): rebuilds what the approved contracts describe and replaces every generated file that differs. | Yara |
 | 4 | QA Tester | the generated app → `test_report.json` | Real Chromium via Playwright, 8 fixed checks: create, list, edit, delete, persistence after refresh, reject incomplete input, empty state, error message visible. Each failure keeps its real error message. | Sara |
 | 5 | Project Manager | all outputs + the real QA outcome → `project_plan.md`, `risks.md` | Jood's agent (PR #12) in `mode="rules"` (no paid calls): stages, timeline, real results, open risks. | Jood |
 
@@ -43,17 +43,24 @@ idea ─► Business Analyst ─► review in the UI ─┬─ request changes �
                                               └─ approve
                                                    │
         designing ─► Architect ─► developing ─► Developer ─► testing ─► QA (Chromium)
-                                                   │
+                                                   ▲                         │ failed
+                                                   └── repairing (≤ 2) ◄─────┘
         documenting ─► Project Manager ─► completed ─► preview (sandboxed) + ZIP
 ```
 
 Status values: `analyzing`, `awaiting_approval`, `awaiting_clarification`, `rejected`, `designing`,
-`developing`, `testing`, `documenting`, `completed`, `failed`. A failed stage is reported with its
+`developing`, `testing`, `repairing`, `documenting`, `completed`, `failed`. A failed stage is reported with its
 real reason; QA failures stay visible in the report and in `risks.md`.
 
-**Not delivered: the automatic repair loop** (QA → Developer → QA). It was planned and is not in
-the pipeline. The Project Manager states "Automatic repair: not available in this version" and never
-claims a repair.
+**Repair loop** (on `main` after PR `feature/final-capabilities`; not yet on the live site): when QA
+finds defects, the Developer repairs and QA re-tests in real Chromium, at most twice. The strategy is
+**deterministic** (`restore_from_contracts`, no LLM, no cost): it can only fix generated files that differ
+from what the approved contracts describe (damaged, edited or stale code). If the files already match,
+it changes nothing, so nothing is re-tested and **no repair is claimed** (`stopped: "no_change"`). An
+LLM-based code repair is **not implemented**. Every step is saved in `repair_history.json` (attempt,
+defects, files changed with hashes before/after, QA result); the first failing report is kept as
+`test_report.initial.json`; Jood's PM lists the attempts; the Tests view shows the history.
+`BUNYAN_REPAIR=off` switches it off.
 
 ## 4. Technical stack
 
@@ -70,19 +77,31 @@ claims a repair.
 
 ## 5. What is live, what is only in branches
 
-| Capability | Live on Railway | Branch `delivery/final-submission` (PR to `main`) |
+| Capability | Live on Railway (`main` @ `296099e`) | PR `feature/final-capabilities` (not deployed) |
 |---|---|---|
 | Five-agent pipeline, preview, ZIP | Yes | Yes |
-| Business Analyst | **mock** only (no paid calls for guests) | mock and llm (llm needs `BA_MODE=llm` + key) |
-| Project Manager | the earlier integration PM (`deploy/club-demo`) | **Jood's PM (PR #12)** with compatibility fixes |
-| Architect message mapping for real LLM wording | No (earlier Architect) | Yes (6/7 and 8/8 messages mapped on the two real runs) |
-| Guest mode, isolation, quotas, CSRF check, sandboxed preview | Yes | Yes |
-| Homepage fix for shared Wi-Fi + Arabic error page | Yes (deployment `f21686ee`, commit `7619e18`) | Yes |
-| Automatic repair loop | No | No |
+| Business Analyst | **mock** only (no paid calls) | mock; plus the **protected real analyst** (access codes, budget), off unless configured |
+| Project Manager | **Jood's PM (PR #12)** with compatibility fixes | same, plus the real repair history |
+| Architect mapping of real-LLM validation wording | Yes | Yes, plus `messages.invalid` (whole-number message) |
+| Repair loop (QA → Developer → QA) | No ("not available in this version") | **Yes, deterministic** (see section 3) |
+| Guest mode, isolation, quotas, CSRF check, sandboxed preview, homepage fix | Yes | Yes |
 
-Live deployment: Railway project `bunyan-club-demo`, service `bunyan`, deployment `f21686ee`,
-code = commit `7619e18` on branch `deploy/club-demo`. Variables: `BUNYAN_AUTH=guest`,
-`BA_MODE=mock`, `BUNYAN_MAX_LLM_ANALYSES_PER_DAY=0`; secrets only in Railway Variables.
+Live deployment: Railway project `bunyan-club-demo`, service `bunyan`, deployment `9e873d4b`,
+code = `main` @ `296099e`. Variables: `BUNYAN_AUTH=guest`, `BA_MODE=mock`,
+`BUNYAN_MAX_LLM_ANALYSES_PER_DAY=0`; secrets only in Railway Variables. Rollback: deployment `f21686ee`.
+
+### Protected real Business Analyst (PR `feature/final-capabilities`, off by default)
+
+`BUNYAN_LLM_ACCESS=codes` keeps `BA_MODE=mock` for everyone. A guest who enters an access code
+(hashed in `BUNYAN_LLM_ACCESS_CODES`, handed out by the lead) gets the real analyst for that browser
+session only (12 h). Limits, all checked **before** a request is sent: per code per day
+(`BUNYAN_LLM_MAX_PER_CODE_PER_DAY`, default 3), site-wide per day and one at a time, and a daily
+budget in USD (`BUNYAN_LLM_DAILY_BUDGET_USD`, default 2) that reserves each request's worst case
+(20,000 input + 32,000 output tokens = 0.72 USD on `claude-opus-5-5`) and then books the real usage
+the API reports. One call per analysis (retries, SDK retries and fallbacks off), direct Anthropic
+backend; the server refuses to start with any weaker setting. Wrong codes: 8 per address per 15 min.
+Clarification answers and change requests of an unlocked session also use the real analyst and count.
+Tested offline with the real output of paid run 44769184001 through a stand-in client; no new paid call.
 
 ## 6. Real-LLM evidence
 
@@ -116,11 +135,13 @@ fields, one message for a whole range ("من 2 إلى 100 حرف"), and messages
 ("يجب ألا يتجاوز العنوان 200 حرف"). The Architect now maps all of these (no contract change); regression
 tests use both real outputs unchanged.
 
-Remaining: **"must be a whole number"** (`يجب أن تكون الكمية عدداً صحيحاً`). The form already rejects
-decimals in integer fields, but the contract (`fields[].messages`) has no slot for that message, so
-the app shows the generic Arabic "القيمة غير صحيحة" and the Architect reports the gap as an explicit
-warning. **Question for Naifah:** add an optional `invalid` message to `FieldMessages` for number and
-select fields (the template already reads it)? It is a contract change, so it was not made before the deadline.
+**Whole-number message (resolved in PR `feature/final-capabilities`, contract v0.3.2).** New optional
+`fields[].messages.invalid`, allowed only on number and select fields and not tied to a rule, so every
+earlier document stays valid and `schema_version` is unchanged. A whole-number criterion on an integer
+field sets it verbatim; the app shows it when a fraction is entered (tested in real Chromium: 2.5 in
+"الكمية" shows "يجب أن تكون الكمية عدداً صحيحاً", decimals still accepted), otherwise the app-language
+`messages.invalid`. Both real runs now map **every** quoted validation message (0 warnings).
+**For Naifah:** the change is described in `backend/agents/architect/contract/CONTRACT.md` ("Addition in v0.3.2").
 
 ## 8. Security
 
@@ -141,23 +162,20 @@ Details in [DEPLOY.md](../DEPLOY.md). In short:
 
 ## 9. Testing evidence
 
-Measured on branch `delivery/final-submission` on November 20, 2026 (local macOS, Python 3.11, Node 22):
+Measured on branch `feature/final-capabilities` on November 21, 2026 (local macOS, Python 3.11, Node 22):
 
 | Suite | Result |
 |---|---|
-| Backend `pytest tests` (API, pipeline, security, guest mode, homepage regression, PM pipeline) | 281 passed |
-| Business Analyst `pytest backend/agents/business_analyst` | 298 passed, 10 skipped (9 paid LLM evals are opt-in; 1 needs CrewAI, not installed) |
-| Architect | 56 passed |
+| Backend `pytest tests` (API, pipeline, security, guest mode, homepage, PM pipeline, repair loop, protected real analyst, integer message in Chromium) | 315 passed |
+| Business Analyst | 298 passed, 10 skipped (9 paid LLM evals are opt-in; 1 needs CrewAI, not installed) |
+| Architect | 60 passed |
 | Project Manager (Jood's tests + QA-outcome tests) | 56 passed |
 | QA Tester (including real Playwright runs) | 11 passed |
 | Developer smoke test | PASS |
-| React unit tests | 25 / 25 passed |
-| React production build | built |
-| Docker build + Docker Compose (healthy, guest mode) | passed |
-| Browser journeys in Compose: English task manager, Arabic inventory, Arabic bookings (idea → analysis → change request → approval → 4 agents → QA 8/8 → ZIP) | 3 / 3 passed |
-| Persistence after container restart; server runs as uid 10001 | passed |
-| Riyadh theme light/dark × desktop/mobile: RTL, no horizontal overflow | 4 / 4 passed |
-| Live site after the last deploy: homepage 200 UTF-8, health, Arabic 404 page, cross-site write 403, full journey QA 8/8 + ZIP | passed |
+| React unit tests / production build | 26 / 26 passed / built |
+| Docker image: browser journeys EN tasks, AR inventory, AR bookings (QA 8/8, PM, ZIP) | 3 / 3 passed |
+| Docker image: real repair on the real-LLM library app (QA 7/8 → app.js restored → re-test 8/8) | passed |
+| Live site (`main` @ `296099e`): homepage, old projects and cookies, isolation, CSRF, Arabic errors, AR/EN journeys QA 8/8, theme 4/4 | passed |
 
 CI results for the final commit are on the pull request. The mock analyst's journeys show the change
 request honestly as "not applied" (the mock cannot rewrite requirements); the real analyst applied one
@@ -169,7 +187,10 @@ in run 44725920842 (the requested supplier-phone field reached the generated app
   appointments/bookings and similar); other ideas get a clarification or refusal. Real analysis needs
   `BA_MODE=llm` with an API key and is not offered to anonymous guests.
 - One entity per app; generated apps store data in the browser only.
-- No automatic repair loop; no whole-number message slot (see section 7).
+- The repair loop is deterministic: it fixes generated files that differ from the approved contracts,
+  not logic errors in the template itself (those need a person or a future LLM repair).
+- The protected real analyst needs an Anthropic key and access codes in the platform variables; it is
+  not enabled on the live site.
 - QA uses a fixed set of 8 checks, not one test per acceptance criterion; the report lists verbatim
   messages that the checks did not compare.
 - LLM output varies between runs; the Architect reports any message it cannot map instead of dropping it.

@@ -261,3 +261,11 @@ export function downloadUrl() {
 }
 
 export const MODE = 'mock';
+
+export async function getLlmAccess() {
+  return { available: false, enabled: false };
+}
+
+export async function unlockLlmAccess() {
+  throw new ApiError(404, 'غير متاح في وضع المحاكاة.');
+}

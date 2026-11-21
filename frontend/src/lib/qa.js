@@ -48,3 +48,36 @@ export function qaSummary(project) {
       return { ...qa, tone: 'neutral', text: '—', note: null };
   }
 }
+
+const STOPPED = {
+  passed: 'انتهت المحاولات بنجاح الفحوصات.',
+  no_change: 'لم يجد الإصلاح التلقائي ما يغيّره في الكود، فلم تُعَد الفحوصات ولم يُحسب إصلاحاً.',
+  budget_used: 'استُنفدت محاولتا الإصلاح.',
+  invalid_repair_output: 'أنتج الإصلاح ملفات غير صالحة، فتوقف دون إعادة الفحوصات.',
+  repair_error: 'تعذّر تنفيذ الإصلاح، فتوقف دون إعادة الفحوصات.',
+  qa_blocked: 'تعذّر إعادة الاختبار بعد الإصلاح.',
+};
+
+/**
+ * The repair history the backend recorded (project.repair, repair_history.json), as rows for the
+ * Tests screen. Nothing is inferred: a row exists only for a step the backend reports.
+ */
+export function repairSteps(project) {
+  const repair = project?.repair;
+  if (!repair || !Array.isArray(repair.history)) return null;
+  const rows = repair.history.map((h) => {
+    if (h.step === 'test') {
+      const qa = h.qa ?? {};
+      const label = h.attempt === 0 ? 'الاختبار الأول' : `إعادة الاختبار ${h.attempt}`;
+      const result = qa.status === 'passed' ? `نجح ${qa.passed} من ${qa.total}`
+        : qa.status === 'failed' ? `فشل ${(qa.failed ?? []).length} من ${qa.total}` : 'تعذّر الاختبار';
+      return { key: `t${h.attempt}`, label, result, tone: qa.status === 'passed' ? 'done' : qa.status === 'failed' ? 'failed' : 'waiting' };
+    }
+    const files = (h.changed_files ?? []).map((c) => c.file).join('، ');
+    const result = h.result === 'changed' ? `غيّر المطوّر: ${files}`
+      : h.result === 'no_change' ? 'لم يتغير أي ملف' : `فشل الإصلاح${h.reason ? `: ${h.reason}` : ''}`;
+    return { key: `r${h.attempt}`, label: `محاولة الإصلاح ${h.attempt} من ${repair.max_repairs ?? 2}`, result,
+      tone: h.result === 'changed' ? 'neutral' : 'failed' };
+  });
+  return { rows, stopped: repair.stopped ? STOPPED[repair.stopped] ?? null : null };
+}

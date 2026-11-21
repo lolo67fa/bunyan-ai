@@ -98,6 +98,9 @@ def run_direct(
                 getattr(usage, "output_tokens", None), message.stop_reason, getattr(message, "_request_id", None))
     if on_message is not None:
         on_message(message)
+    hook = _usage_hook()
+    if hook is not None:
+        hook(message)  # the server's spending control (backend/llm_access.py) settles the real cost
 
     if message.stop_reason == "refusal":
         details = getattr(message, "stop_details", None)
@@ -106,3 +109,12 @@ def run_direct(
     if message.stop_reason == "max_tokens":
         raise LLMRefusal(f"answer was cut off at max_tokens={settings.max_tokens} (request id: {message._request_id})")
     return "".join(block.text for block in message.content if block.type == "text")
+
+
+def _usage_hook():
+    """The server's per-analysis usage callback, when the BA runs inside the BUNYAN backend."""
+    try:
+        from backend.llm_access import usage_hook
+    except ImportError:  # the agent used on its own
+        return None
+    return usage_hook()

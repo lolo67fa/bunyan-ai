@@ -82,3 +82,21 @@ test('a failed run that produced the app is marked as usable in the list', () =>
   assert.equal(hasGeneratedApp(p), true);
   assert.equal(projectStage(p), 'توقف · التطبيق متاح');
 });
+
+test('repair history: only the steps the backend recorded, and no repair claimed without a change', async () => {
+  const { repairSteps } = await import('../src/lib/qa.js');
+  assert.equal(repairSteps({ repair: null }), null);
+  const fixed = repairSteps({ repair: { max_repairs: 2, stopped: 'passed', history: [
+    { attempt: 0, step: 'test', qa: { status: 'failed', passed: 7, total: 8, failed: [{ check_id: 'persist_after_refresh' }] } },
+    { attempt: 1, step: 'repair', result: 'changed', changed_files: [{ file: 'app.js' }] },
+    { attempt: 1, step: 'test', qa: { status: 'passed', passed: 8, total: 8, failed: [] } },
+  ] } });
+  assert.deepEqual(fixed.rows.map((r) => r.result), ['فشل 1 من 8', 'غيّر المطوّر: app.js', 'نجح 8 من 8']);
+  const none = repairSteps({ repair: { stopped: 'no_change', history: [
+    { attempt: 0, step: 'test', qa: { status: 'failed', passed: 7, total: 8, failed: [{}] } },
+    { attempt: 1, step: 'repair', result: 'no_change', changed_files: [] },
+  ] } });
+  assert.equal(none.rows.length, 2);
+  assert.equal(none.rows[1].result, 'لم يتغير أي ملف');
+  assert.match(none.stopped, /لم يُحسب إصلاحاً/);
+});

@@ -45,7 +45,8 @@
 | Five agents + orchestrator | Implemented: Business Analyst → user approval → Architect → Developer → QA (real Playwright, Chromium) → Project Manager → preview and ZIP. |
 | Business Analyst | Two modes. `mock`: deterministic, recognises only the predefined example ideas (task manager, inventory, appointments/bookings…). `llm`: Claude (`claude-opus-5-5`) through the Anthropic SDK, verified with real paid runs (see [docs/SUBMISSION.md](docs/SUBMISSION.md#real-llm-evidence)). The public demo runs `mock`. |
 | Architect, Developer, QA, Project Manager | Deterministic (no LLM): rules, a fixed CRUD template and a fixed 8-check Playwright suite. The PM runs in `mode="rules"`. |
-| Automatic repair loop (QA → Developer) | **Not part of this delivery.** Failed checks are reported honestly in `test_report.json` and `risks.md`; nothing claims a repair happened. |
+| Automatic repair loop (QA → Developer) | **Deterministic, at most 2 repairs** (`BUNYAN_REPAIR=restore`): the Developer restores generated files that differ from the approved contracts and QA re-tests in real Chromium; a repair that changes nothing is not re-tested or claimed. No LLM repair. History in `repair_history.json`. (Merged after the live deployment; live shows "not available".) |
+| Protected real Business Analyst | `BUNYAN_LLM_ACCESS=codes`: guests stay on mock; an access code unlocks Claude for one session, with per-code, site-wide and USD-budget limits. Off by default and not enabled on the live site. |
 | Platform | React (Vite) with the Riyadh theme (light/dark, RTL/LTR, desktop/mobile), FastAPI backend. |
 | Deployment | One Docker image; live on Railway in guest mode with signed sessions, per-owner isolation, quotas and a sandboxed preview. |
 
@@ -90,7 +91,7 @@ Key characteristics of the solution:
 - **Structured workflow.** Agents follow a fixed sequence that mirrors a real development lifecycle: analysis → design → implementation → testing → project management.
 - **Human in the loop.** The user reviews and approves the generated requirements before any design or code is produced.
 - **Shared JSON contracts.** Agents communicate through agreed-upon JSON schemas, making outputs predictable and testable.
-- **Automated quality assurance.** Generated applications are tested in a real browser with Playwright; the actual results, including failures, are reported to the user and the Project Manager. (An automatic QA → Developer repair loop was planned; it is not part of this delivery.)
+- **Automated quality assurance.** Generated applications are tested in a real browser with Playwright; the actual results, including failures, are reported to the user and the Project Manager. Failures go back to the Developer for a deterministic repair (at most two), and QA re-tests after each real change.
 - **Complete deliverables.** Alongside the code, the user receives requirements, architecture, test results, a project plan, and a risk report.
 - **Focused scope.** The MVP targets CRUD web applications only, which keeps generation reliable and results verifiable.
 
@@ -104,7 +105,7 @@ By the end of the four-week MVP, the team aims to:
 2. **Produce structured requirements** (`requirements.json`) containing entities, attributes, functional requirements, user stories, and acceptance criteria.
 3. **Produce an architecture specification** (`architecture.json`) describing screens, components, data schema, and navigation.
 4. **Run automated functional tests** with Playwright against every generated application and produce an actual test report (`test_report.json`).
-5. ~~Automatically attempt to repair failed tests~~ — planned, **not delivered**: failures are reported, not repaired.
+5. **Automatically attempt to repair failed tests**, at most two Developer–QA iterations (deterministic strategy; see below).
 6. **Generate project documentation** — a project plan (`project_plan.md`) and a risk report (`risks.md`).
 7. **Provide a live preview and a downloadable package** of the generated application and all artifacts.
 8. **Demonstrate successful generation across several different CRUD scenarios** (for example: task manager, appointment booking, inventory tracker, order manager) during final evaluation.
@@ -175,8 +176,8 @@ Software Architect Agent ──► architecture.json
    │
    ▼
 Developer Agent ──► index.html, style.css, app.js
-   │
-   ▼
+   │        ▲
+   ▼        │  real defects (max 2 deterministic repairs, re-test after each real change)
 QA Tester Agent ──► test_report.json   (real Chromium, 8 fixed checks)
    │
    ▼
@@ -223,7 +224,7 @@ Preview & Download
 - Implements Create, Read, Update, and Delete operations.
 - Implements input validation.
 - Implements localStorage persistence.
-- (Fixing defects from QA feedback is future work; see the repair-loop note below.)
+- Repairs the app after a QA failure by restoring every generated file that differs from the approved contracts (deterministic; see below).
 
 #### 4. QA Tester Agent
 
@@ -242,12 +243,21 @@ Preview & Download
 - Identifies risks and issues.
 - Summarizes project status and deliverables.
 
-### Error-Correction Loop (QA ↔ Developer): not delivered
+### Error-Correction Loop (QA ↔ Developer)
 
-The original plan included a capped (two-attempt) repair loop. **It is not implemented in the delivered
-pipeline.** When a check fails, the run ends with the real result: `test_report.json` keeps the failing
-check and its message, the Project Manager lists it as an open risk ("no automatic repair in this
-version"), and the user sees the actual numbers. No document claims a repair that did not happen.
+1. QA runs the 8 checks in Chromium (attempt 0).
+2. If checks fail, the Developer gets the real defects and repairs (`restore_from_contracts`):
+   it rebuilds the app the approved `requirements.json` and `architecture.json` describe and replaces
+   every generated file that differs (with SHA-256 before/after in the history).
+3. Only if a file changed, QA re-tests (attempt 1, then 2). At most **two** repairs.
+4. The loop stops when QA passes, the repair changes nothing (no re-test, no repair claimed), the repair
+   output is invalid, QA is blocked, or the budget is used. The real final report is kept, the first
+   failing one is saved as `test_report.initial.json`, and `repair_history.json` lists every step.
+5. Jood's Project Manager reports the attempts and files changed; the Tests view shows the history.
+
+The strategy is deterministic and free: it repairs damaged, edited or stale generated code, not a logic
+error in the template itself. An LLM-based code repair is **not implemented**. `BUNYAN_REPAIR=off`
+disables the loop.
 
 ### Orchestration
 
@@ -496,7 +506,7 @@ Results will be recorded with the actual values measured during Week 4 evaluatio
 - **API key management.** API keys are provided through environment variables (`.env`), which is excluded from Git. Only variable names are listed in `.env.example`. Keys must never be committed, shared in issues, or exposed to the frontend.
 - **Isolated execution of AI-generated code.** Generated applications are untrusted code. They are previewed in a sandboxed environment (e.g., a sandboxed iframe) and tested in isolated Playwright browser contexts, never executed with backend privileges.
 - **Synthetic test data.** Testing uses synthetic data only; no real personal or business data is used.
-- **No automatic repair.** The planned QA–Developer repair loop is not part of this delivery; failures are reported as they are.
+- **Limited automatic repair.** At most two deterministic repairs; nothing is claimed unless files really changed and QA re-tested them.
 - **Shared demo controls.** The public demo uses signed anonymous guest sessions, per-owner project isolation, Origin checks, per-guest/per-address/site-wide quotas, a sandboxed preview (CSP `sandbox`) and no paid LLM access. See [DEPLOY.md](DEPLOY.md).
 - **LLM output variability.** Language-model output is non-deterministic; results may vary between runs, and generated code should be reviewed before any reuse.
 - **Not for production.** BUNYAN AI is an academic prototype. Neither the platform nor the generated applications are intended for production deployment.
