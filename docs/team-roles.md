@@ -1,6 +1,9 @@
 # Team Roles and Ownership
 
-This document defines the responsibilities and ownership boundaries for each of the six BUNYAN AI team members.
+This document defines the responsibilities and ownership boundaries for each of the six BUNYAN AI team members,
+as planned at the start of the project. What each member actually delivered, including the responsibilities
+that moved during the project, is documented in [ghala-contribution-audit.md](ghala-contribution-audit.md)
+and the README's "Team & Contributions" section.
 
 ## Ownership Principles
 
