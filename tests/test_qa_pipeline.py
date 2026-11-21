@@ -464,7 +464,7 @@ def test_default_runner_is_the_real_qa_tester(tmp_path, monkeypatch, qa_on):
     assert pipeline.run_qa is runner and len(runner.calls) == 1
     assert project["qa"]["status"] == "passed"
     from backend.agents.qa_tester.runner import run_qa
-    assert pipeline.run_pipeline.__kwdefaults__ == {"qa_runner": None}
+    assert pipeline.run_pipeline.__kwdefaults__ == {"qa_runner": None, "repair": None}
     assert run_qa.__module__ == "backend.agents.qa_tester.runner"
 
 

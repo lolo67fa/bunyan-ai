@@ -45,6 +45,12 @@ def qa_off_by_default(monkeypatch):
     monkeypatch.setenv("BUNYAN_QA", "off")
 
 
+@pytest.fixture(autouse=True)
+def repair_off_by_default(monkeypatch):
+    """The older suites test the pipeline without the repair loop; tests/test_repair_loop.py turns it on."""
+    monkeypatch.setenv("BUNYAN_REPAIR", "off")
+
+
 @pytest.fixture
 def qa_on(monkeypatch):
     """Let the pipeline run the real QA Tester for this test."""
