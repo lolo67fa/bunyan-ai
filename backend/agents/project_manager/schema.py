@@ -42,6 +42,10 @@ class PMInput(BaseModel):
     repair_loop_available: bool = Field(
         False, description="True only when the orchestrator really sends failed checks back to the Developer. "
                            "Without it no text claims or promises a repair.")
+    repair_history: Optional[Dict[str, Any]] = Field(
+        None, description="The orchestrator's repair_history.json: {history: [{attempt, step: test|repair, ...}], "
+                          "stopped: passed|no_change|budget_used|invalid_repair_output|repair_error|qa_blocked}. "
+                          "Only repairs that changed files count.")
     qa: Optional[Dict[str, Any]] = Field(
         None, description="The orchestrator's QA outcome: {status: passed|failed|blocked|not_run, reason}. "
                           "Tells a run where QA was switched off or blocked from one that passed.")

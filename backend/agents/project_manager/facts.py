@@ -56,12 +56,26 @@ class Facts:
     qa_blocked_reason: Optional[str] = None
 
     repair_attempt: int = 0
+    has_repair_history: bool = False                     # the orchestrator sent repair_history.json
+    repair_stopped: Optional[str] = None                 # why the repair loop ended (repair_history.stopped)
+    repair_steps: List[Dict[str, Any]] = field(default_factory=list)  # repair entries of repair_history
     run_time_seconds: Optional[float] = None
     stage_seconds: Dict[str, float] = field(default_factory=dict)
 
     @property
     def code_done(self) -> bool:
         return all(f in self.generated_files for f in CODE_FILES) or self.has_test_report
+
+    @property
+    def repair_pending(self) -> bool:
+        """A repair is still coming. With the orchestrator's repair history: only while the loop has
+        not stopped and the pipeline is still testing or repairing. Without it (standalone use, the
+        samples): a loop with attempts left, as in the original agent."""
+        if not (self.repair_loop_available and self.repair_attempt < 2):
+            return False
+        if self.has_repair_history:
+            return self.repair_stopped is None and self.workflow_status in ("testing", "repairing")
+        return True
 
     @property
     def run_completed(self) -> bool:
@@ -153,4 +167,8 @@ def collect(data: PMInput) -> Facts:
     if qa.get("status") in ("passed", "failed", "blocked", "not_run"):
         f.qa_status = qa["status"]  # the orchestrator saw the whole QA stage, not only the report
     f.qa_reason = _text(qa.get("reason")) or f.qa_blocked_reason
+    rh = data.repair_history if isinstance(data.repair_history, dict) else {}
+    f.has_repair_history = bool(rh)
+    f.repair_stopped = _text(rh.get("stopped")) or None
+    f.repair_steps = [s for s in _list(rh.get("history")) if isinstance(s, dict) and s.get("step") == "repair"]
     return f

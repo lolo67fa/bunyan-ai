@@ -59,7 +59,7 @@ def build_stages(f: Facts) -> List[Stage]:
     if f.has_test_report:
         if f.all_passed:
             tests_status = "done"
-        elif f.qa_blocked_reason or f.checks_not_run or not f.repair_loop_available or f.repair_attempt >= 2:
+        elif f.qa_blocked_reason or f.checks_not_run or not f.repair_pending:
             tests_status = "failed"  # no repair is coming: the stage ended with defects or could not test
         else:
             tests_status = "in_progress"
@@ -183,6 +183,18 @@ def plan_markdown(f: Facts, stages: List[Stage], risks: List[Risk], summary: str
                         "- **Tests:** not run" + (f" ({f.qa_reason})." if f.qa_reason else ".")))
     if f.repair_loop_available:
         lines.append(_t(L, f"- **محاولات الإصلاح:** {f.repair_attempt} من 2.", f"- **Repair attempts:** {f.repair_attempt} of 2."))
+        for step in f.repair_steps:
+            files = ", ".join(c.get("file", "") for c in step.get("changed_files") or [])
+            n = step.get("attempt")
+            if step.get("result") == "changed":
+                lines.append(_t(L, f"  - المحاولة {n}: غيّر المطوّر {files}، ثم أُعيدت الفحوصات.",
+                                f"  - Attempt {n}: the Developer changed {files}; the checks ran again."))
+            elif step.get("result") == "no_change":
+                lines.append(_t(L, f"  - المحاولة {n}: لم يتغير أي ملف، فلم تُعَد الفحوصات ولا يُحسب إصلاحاً.",
+                                f"  - Attempt {n}: no file changed, so the checks were not re-run and it does not count as a repair."))
+            else:
+                lines.append(_t(L, f"  - المحاولة {n}: فشل الإصلاح ({step.get('reason', '')}).",
+                                f"  - Attempt {n}: the repair failed ({step.get('reason', '')})."))
     else:
         lines.append(_t(L, "- **الإصلاح التلقائي:** غير متوفر في هذه النسخة.", "- **Automatic repair:** not available in this version."))
     lines.append(_t(L, f"- **المتطلبات:** {ar(f.requirement_count, 'requirement')} (منها {f.must_count} إلزامية)، و{ar(f.criteria_count, 'criterion')}.",

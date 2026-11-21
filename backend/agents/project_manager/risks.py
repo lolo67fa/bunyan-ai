@@ -90,9 +90,15 @@ def _tests(f: Facts) -> List[Draft]:
         elif f.repair_attempt >= 2:
             mitigation = _t(L, "انتهت محاولتا الإصلاح: سلّم الكود مع تقرير العيوب وراجع الخلل يدوياً.",
                             "Both repair attempts are used: deliver the code with the defect report and fix it by hand.")
-        else:
+        elif f.repair_pending:
             mitigation = _t(L, "أُرسل العيب للمطوّر لإصلاحه، ثم تُعاد الفحوصات الثمانية.",
                             "The defect went back to the Developer; all 8 checks run again after the fix.")
+        elif f.repair_stopped == "no_change":
+            mitigation = _t(L, "لم يجد الإصلاح التلقائي ما يغيّره (ملفات التطبيق تطابق التصميم المعتمد)، فلم يُدَّعَ إصلاح: أصلح الخلل يدوياً حسب رسالة الخطأ.",
+                            "The automatic repair found nothing to change (the app files already match the approved design), so no repair is claimed: fix it by hand from the error message.")
+        else:
+            mitigation = _t(L, "توقف الإصلاح التلقائي في هذا التشغيل دون إصلاح الخلل: أصلحه يدوياً حسب رسالة الخطأ، ثم أعد الفحوصات.",
+                            "The automatic repair stopped in this run without fixing it: fix it by hand from the error message, then run the checks again.")
         out.append({
             "title": _t(L, f"فحص «{name}» يفشل{detail}", f"Check “{name}” fails{detail}"),
             "likelihood": "high", "impact": "high",
