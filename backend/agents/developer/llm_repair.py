@@ -255,4 +255,8 @@ def check_configuration() -> None:
         return
     if not llm_access.enabled():
         raise RuntimeError("BUNYAN_REPAIR=llm needs BUNYAN_LLM_ACCESS=codes: AI repair is only for authorised testers")
-    llm_access.check_configuration()
+    # The rest (codes, key, retries, budget) is checked by llm_access.check_configuration at startup.
+    from backend.llm_access import PRICES, _settings
+
+    if _settings().model not in PRICES:
+        raise RuntimeError("BUNYAN_REPAIR=llm needs a model with a known price for its cost reservation")
