@@ -44,7 +44,19 @@ Uncertain:
 - Free pre-flight calls (model lookup, token counting) are not included.
 - Any other use of the same API key outside BUNYAN is unknown to the app.
 
-**Decision needed:** start the ledger at `1.2919` (remaining $3.7081) or at `0` (the experiment counts only new requests).
+**Approved by the project lead (2026-11-21):**
+
+| | Amount |
+|---|---|
+| Lifetime experiment budget (`BUNYAN_TOTAL_LLM_BUDGET_USD`) | **$5.0000** |
+| Estimated past spending, recorded as the starting debit (`BUNYAN_LLM_BUDGET_STARTING_SPENT_USD`) | **$1.2919** |
+| Estimated remaining budget | **$3.7081** |
+
+- **Not an invoice.** $1.2919 is an estimate from logged token usage at list price. It is subject to reconciliation with Anthropic's billing records. Changing it needs the lead's approval.
+- **No paid AI feature is active.** In production, `BUNYAN_LLM_ACCESS` and `BUNYAN_TOTAL_LLM_BUDGET_USD` are not set, so no ledger exists yet. The ledger is created at activation, with the starting debit of $1.2919, not zero.
+- **Activation needs separate approvals:** one for the real BA, and another for the AI repair.
+- **A daily budget is not a lifetime cap.** Only `BUNYAN_TOTAL_LLM_BUDGET_USD` limits the whole experiment.
+- **Provider-side limits are separate.** Any limit at Anthropic (below) must be set by the lead; it is monthly, not lifetime.
 
 ### Provider-side cap (Anthropic Console)
 
@@ -79,7 +91,7 @@ Together with the app's cumulative ledger, that gives two independent limits. Ne
 | AI repairs | **off** (`BUNYAN_REPAIR=restore`) | Stage D only. |
 | Real analyses, whole site, per day | 10 (`BUNYAN_MAX_LLM_ANALYSES_PER_DAY`, today 0) | Hard cap, independent of the budget. |
 | Concurrent paid requests | 1 analysis (`BUNYAN_MAX_CONCURRENT_ANALYSES=1`) and 1 AI repair (fixed lock) at a time | Bounded load and spend. |
-| **Total budget, whole experiment** | **$5.00** (`BUNYAN_TOTAL_LLM_BUDGET_USD`), starting balance per the decision above | Never reset; reserved before each request. |
+| **Total budget, whole experiment** | **$5.00** (`BUNYAN_TOTAL_LLM_BUDGET_USD`), starting debit **$1.2919** (approved), remaining $3.7081 | Never reset; reserved before each request. |
 | Daily budget, whole site | $2 (`BUNYAN_LLM_DAILY_BUDGET_USD`) | Extra safeguard. |
 | Monthly cap at Anthropic | $5 on a dedicated workspace and key (set by the lead) | Independent limit outside BUNYAN. |
 | Grant lifetime | 12 h (`BUNYAN_LLM_ACCESS_HOURS`) | A code must be re-entered after that. |
