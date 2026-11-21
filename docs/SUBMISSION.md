@@ -52,7 +52,7 @@ Status values: `analyzing`, `awaiting_approval`, `awaiting_clarification`, `reje
 `developing`, `testing`, `repairing`, `documenting`, `completed`, `failed`. A failed stage is reported with its
 real reason; QA failures stay visible in the report and in `risks.md`.
 
-**Repair loop** (on `main` after PR `feature/final-capabilities`; not yet on the live site): when QA
+**Repair loop** (on `main` since [PR #17](https://github.com/lolo67fa/bunyan-ai/pull/17), merge `fdcef1d`; not yet on the live site): when QA
 finds defects, the Developer repairs and QA re-tests in real Chromium, at most twice. The strategy is
 **deterministic** (`restore_from_contracts`, no LLM, no cost): it can only fix generated files that differ
 from what the approved contracts describe (damaged, edited or stale code). If the files already match,
@@ -77,7 +77,7 @@ defects, files changed with hashes before/after, QA result); the first failing r
 
 ## 5. What is live, what is only in branches
 
-| Capability | Live on Railway (`main` @ `296099e`) | PR `feature/final-capabilities` (not deployed) |
+| Capability | Live on Railway (`main` @ `296099e`) | `main` after PR #17 (`fdcef1d`, not deployed) |
 |---|---|---|
 | Five-agent pipeline, preview, ZIP | Yes | Yes |
 | Business Analyst | **mock** only (no paid calls) | mock; plus the **protected real analyst** (access codes, budget), off unless configured |
@@ -90,7 +90,7 @@ Live deployment: Railway project `bunyan-club-demo`, service `bunyan`, deploymen
 code = `main` @ `296099e`. Variables: `BUNYAN_AUTH=guest`, `BA_MODE=mock`,
 `BUNYAN_MAX_LLM_ANALYSES_PER_DAY=0`; secrets only in Railway Variables. Rollback: deployment `f21686ee`.
 
-### Protected real Business Analyst (PR `feature/final-capabilities`, off by default)
+### Protected real Business Analyst (on `main` since PR #17, off by default, not deployed)
 
 `BUNYAN_LLM_ACCESS=codes` keeps `BA_MODE=mock` for everyone. A guest who enters an access code
 (hashed in `BUNYAN_LLM_ACCESS_CODES`, handed out by the lead) gets the real analyst for that browser
@@ -135,7 +135,7 @@ fields, one message for a whole range ("من 2 إلى 100 حرف"), and messages
 ("يجب ألا يتجاوز العنوان 200 حرف"). The Architect now maps all of these (no contract change); regression
 tests use both real outputs unchanged.
 
-**Whole-number message (resolved in PR `feature/final-capabilities`, contract v0.3.2).** New optional
+**Whole-number message (resolved in PR #17, merged; contract v0.3.2).** New optional
 `fields[].messages.invalid`, allowed only on number and select fields and not tied to a rule, so every
 earlier document stays valid and `schema_version` is unchanged. A whole-number criterion on an integer
 field sets it verbatim; the app shows it when a fraction is entered (tested in real Chromium: 2.5 in
@@ -162,7 +162,7 @@ Details in [DEPLOY.md](../DEPLOY.md). In short:
 
 ## 9. Testing evidence
 
-Measured on branch `feature/final-capabilities` on November 21, 2026 (local macOS, Python 3.11, Node 22):
+Measured on branch `feature/final-capabilities` (PR #17, merged into `main` as `fdcef1d`) on November 21, 2026 (local macOS, Python 3.11, Node 22):
 
 | Suite | Result |
 |---|---|
@@ -200,7 +200,7 @@ in run 44725920842 (the requested supplier-phone field reached the generated app
 
 | Member | Contribution | Pull requests |
 |---|---|---|
-| Ghala Alshreef (founder, lead) | Project definition and team plan; Business Analyst (mock + LLM, contract, revisions, live tests); the orchestrator; integration of every component; backend API extensions and the frontend–backend connection; Docker, Railway, CI; security and guest mode; production fixes; release and delivery. Evidence: [ghala-contribution-audit.md](ghala-contribution-audit.md) | #1, #2, #6, #8, #15, #16 |
+| Ghala Alshreef (founder, lead) | Project definition and team plan; Business Analyst (mock + LLM, contract, revisions, live tests); the orchestrator; integration of every component; backend API extensions and the frontend–backend connection; Docker, Railway, CI; security and guest mode; production fixes; release and delivery. Evidence: [ghala-contribution-audit.md](ghala-contribution-audit.md) | #1, #2, #6, #8, #15, #16, #17, #18 |
 | Naifah | Software Architect agent and `architecture.json` contract | #4 |
 | Yara | Developer agent and the CRUD template | #10 |
 | Sara | QA Tester: 8-check Playwright suite and `test_report.json` | #7 |

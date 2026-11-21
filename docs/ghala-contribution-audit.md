@@ -3,7 +3,8 @@
 Evidence ledger for the contributions of **Ghala Alshreef** (GitHub `lolo67fa`), founder and team
 lead of BUNYAN AI, from the first commit (October 20, 2026) to the final release (`main` @
 [`296099e`](https://github.com/lolo67fa/bunyan-ai/commit/296099e), November 21, 2026) and the
-open follow-up [PR #17](https://github.com/lolo67fa/bunyan-ai/pull/17).
+follow-up [PR #17](https://github.com/lolo67fa/bunyan-ai/pull/17), merged into `main` as
+[`fdcef1d`](https://github.com/lolo67fa/bunyan-ai/commit/fdcef1d) on November 21, 2026.
 
 It supports the "Team & Contributions" section of the [README](../README.md). Every entry names
 the commits, pull requests, tests or deployments it rests on.
@@ -16,7 +17,7 @@ the commits, pull requests, tests or deployments it rests on.
 |---|---|
 | Git history, all refs | 92 commits on every remote branch (84 on `main`), authors, committers, merges, `Co-Authored-By` trailers, files changed per commit |
 | `git blame` of `main` @ `296099e` | Who last wrote each line of the delivered code, per area (section 5). This measures the final code, not effort. |
-| GitHub pull requests #1–#17 | Author, merger, dates and size of each PR; who opened and merged it |
+| GitHub pull requests #1–#18 | Author, merger, dates and size of each PR; who opened and merged it |
 | GitHub Actions | Who triggered each run (CI, and the manual paid Business Analyst tests) |
 | Railway | Deployment history of the service `bunyan` (project `bunyan-club-demo`) |
 | Claude Code session history on the lead's computer | The instructions Ghala gave in three local sessions: Nov 4, Nov 11–19, and Nov 7–21 (sections 6 and 7) |
@@ -69,7 +70,7 @@ member. The team is six people.
 | J | Production debugging (Safari 429, UTF-8, QA port, preview CSP) | Diagnosed and fixed (AI-assisted) | `858ce45`, `7619e18`, Railway logs, deployment `f21686ee` | Verified |
 | K | Real-LLM verification and cost control | Designed the safeguards, approved each paid run | Workflow runs 42211456095, 44716341099, 44725920842, 44769184001 | Verified |
 | L | Final delivery and release | Release manager | PR #16 (`296099e`), `docs/SUBMISSION.md`, `docs/user-guide-ar.md`, Railway deployment `9e873d4b` | Verified |
-| M | Post-release capabilities (repair loop, protected real BA, contract v0.3.2) | Implemented (AI-assisted); **open PR, not merged** | PR #17 | Verified (unmerged) |
+| M | Post-release capabilities: deterministic repair loop, protected real BA access, integer validation message (Architect contract v0.3.2) | Specified, decided and approved; implemented (AI-assisted under her direction) | PR #17, merged as `fdcef1d` (section 3.M) | Verified |
 
 ---
 
@@ -116,9 +117,9 @@ was implemented by Ghala, AI-assisted under her direction.
 | Nov 11 | QA stage: one QA run at a time (thread and file lock), evidence copied into the project, server paths removed, outcomes passed / failed / blocked / not_run, metrics | `backend/orchestrator/qa_stage.py` | [`c097bf8`](https://github.com/lolo67fa/bunyan-ai/commit/c097bf8) | `tests/test_qa_pipeline.py` (705 lines, including real Playwright) | Verified |
 | Nov 12 | PM stage after QA (first with an interim agent) | `pipeline.py` | `d5da5a9` | `tests/test_pm_pipeline.py` | Verified |
 | Nov 20 | QA receives `architecture.json`; an Architect crash is flagged before approval | `pipeline.py`, `main.py` | `8bfd313` | tests | Verified |
-| Nov 21 | (PR #17, open) Repair loop Developer → QA → repair → QA re-test, at most 2; `repair_history.json` | `pipeline.py`, `qa_stage.py`, `developer/repair.py` | `f674274` | `tests/test_repair_loop.py` (13, including real Chromium) | Verified (unmerged) |
+| Nov 21 | Repair loop Developer → QA → repair → QA re-test, at most 2; `repair_history.json` (PR #17, merged) | `pipeline.py`, `qa_stage.py`, `developer/repair.py` | `f674274` | `tests/test_repair_loop.py` (13, including real Chromium) | Verified |
 
-All 735 lines of `backend/orchestrator` on `main` are Ghala's (`git blame`).
+All 735 lines of `backend/orchestrator` at the release (`296099e`) are Ghala's, and all 839 after PR #17 (`git blame`).
 
 ### D. Integration of the other members' agents
 
@@ -169,7 +170,7 @@ Sara owns the QA agent: the 8-check suite, `tests/e2e/lib` and `specs`, and the 
 | Nov 12 | Interim rules-based PM so the five-agent pipeline worked end to end before PR #12 was ready | [`d5da5a9`](https://github.com/lolo67fa/bunyan-ai/commit/d5da5a9) (superseded: removed in `92681fb`) | Verified |
 | Nov 19 | Independent test of Jood's PR #12; found four accuracy issues: claimed repairs that did not happen, lost QA messages, QA states merged, a run time of 0 hidden | Nov 19 session; reported to the team | Verified |
 | Nov 20 | Merged PR #12 unchanged (`15bfb5e`), then a separate commit with an orchestrator adapter (`mode="rules"`, no paid call), the fixes for those four issues, and 7 new tests | [`90e7d87`](https://github.com/lolo67fa/bunyan-ai/commit/90e7d87), [`92681fb`](https://github.com/lolo67fa/bunyan-ai/commit/92681fb) | Verified |
-| Nov 21 | (PR #17, open) PM reports the real repair history; Jood's samples unchanged | `5eab528` | Verified (unmerged) |
+| Nov 21 | PM reports the real repair history, as a separate commit; Jood's samples unchanged (PR #17, merged) | `5eab528` | Verified |
 
 Jood owns the PM agent: 1,577 of 1,740 lines of `backend/agents/project_manager` on `main`. Ghala's 163 lines are the compatibility fixes.
 
@@ -191,7 +192,7 @@ Jood owns the PM agent: 1,577 of 1,740 lines of `backend/agents/project_manager`
 | Sandboxed preview (CSP `sandbox`, no network), QA process without secrets, QA port isolated from the web server | `f895495` | Verified |
 | Guest mode: signed anonymous sessions (HMAC-SHA256; HttpOnly, Secure, SameSite=Lax), per-guest, per-address and site-wide limits, limit on new sessions per address, Origin check against cross-site writes, refusal to start with a paid analyst for guests | [`5c79adb`](https://github.com/lolo67fa/bunyan-ai/commit/5c79adb), `tests/test_guest_mode.py` (18) | Verified |
 | Live checks: spoofed `X-Forwarded-For` cannot bypass the per-address limit; isolation between guests; forged cookie → 404; cross-site POST → 403 | the Nov 20 session and Railway logs | Verified |
-| (PR #17, open) Protected real analyst for guests: hashed access codes, per-code and site caps, daily USD budget reserved before each request | `e29b106`, `tests/test_llm_access.py` (17) | Verified (unmerged) |
+| Protected real analyst for guests: hashed access codes, per-code and site caps, daily USD budget reserved before each request (PR #17, merged; off by default) | `e29b106`, `tests/test_llm_access.py` (17) | Verified |
 
 ### J. Production debugging
 
@@ -222,6 +223,57 @@ All five were triggered by `lolo67fa`, each after an explicit decision. Safeguar
 | Submission documentation: README status, `docs/SUBMISSION.md` (live vs branch, evidence, limitations, rollback), Arabic user guide, deployment guide | [`1ef728d`](https://github.com/lolo67fa/bunyan-ai/commit/1ef728d) | Verified |
 | GitHub `main` and Railway run the same code | deployment `9e873d4b` built from a clean checkout of `296099e` | Verified |
 
+### M. PR #17: repair loop, protected real BA access, integer validation (merged Nov 21)
+
+[PR #17](https://github.com/lolo67fa/bunyan-ai/pull/17): 38 files, +1,496 / −99. Opened and merged by
+`lolo67fa` (merge `fdcef1d`), CI green on head `be2e6c6`. AI-assisted under Ghala's direction (all
+six commits carry the trailer).
+
+**Ghala's instruction (Nov 21).** Finish the remaining engineering work and verify that the whole team
+deliverable is on GitHub. Her constraints:
+- no paid calls without approval;
+- production stays in mock mode;
+- no merge or deployment without approval;
+- no breaking contract change without coordinating with Naifah;
+- never fabricate test results or claim a repair that did not change code;
+- regression tests for every case.
+
+**Technical decisions, taken within those constraints and approved when she merged:**
+
+| Decision | Why | Where |
+|---|---|---|
+| Repair strategy is **deterministic** (`restore_from_contracts`): rebuild the app from the approved contracts and replace every generated file that differs; no LLM | Real repairs without paid calls or new secrets; an LLM repair would have needed a separately approved provider setup | `backend/agents/developer/repair.py` (63 lines added next to Yara's 39) |
+| A repair counts only if a file changed; then QA re-tests in real Chromium (attempts 1 and 2); otherwise the loop stops (`no_change`) | No claimed repair without a real change and a real re-test | `backend/orchestrator/pipeline.py`, `qa_stage.py` (the report's attempt must match) |
+| Save `repair_history.json` and the first failing report `test_report.initial.json`; serve and zip them | The original failure and every step stay inspectable | `backend/artifacts.py` |
+| Jood's PM gets an optional `repair_history` input; without it her agent behaves as before | Accurate reports without changing her samples or her tests | `5eab528` (separate commit, her samples byte-identical) |
+| Older test suites run with `BUNYAN_REPAIR=off`; new suites cover the loop | Existing tests keep checking the no-repair path | `tests/conftest.py`, `tests/test_repair_loop.py` |
+| Real BA for guests only through **access codes**; `BA_MODE` stays `mock`; off by default | The public site cannot spend money; the key and codes stay in platform variables | `backend/llm_access.py` (287 lines) |
+| Spending checked **before** a request: per code per day (3), site-wide per day, one at a time, daily USD budget (2) that reserves the worst case (0.72 USD) and then books the real usage | The budget cannot be exceeded, even with requests in flight | `backend/llm_access.py`, `direct_llm.py` usage hook |
+| The server refuses to start unless retries, SDK retries and fallbacks are off, the output cap is ≤ 32,000 and the backend is direct | Unsafe settings fail loudly instead of costing money | `llm_access.check_configuration` |
+| Integer message as an **optional** `fields[].messages.invalid` (number and select fields only), `schema_version` unchanged | Backwards compatible; the template already read it; documented for Naifah | `backend/agents/architect/schema.py`, `from_requirements.py`, `contract/CONTRACT.md` ("Addition in v0.3.2") |
+
+**Commits:**
+
+| Commit | Content |
+|---|---|
+| [`4a9f4fd`](https://github.com/lolo67fa/bunyan-ai/commit/4a9f4fd) | Architect v0.3.2 `messages.invalid`, regenerated JSON schema, schema, conversion and browser tests |
+| [`5eab528`](https://github.com/lolo67fa/bunyan-ai/commit/5eab528) | Jood's PM reports the real repair history |
+| [`f674274`](https://github.com/lolo67fa/bunyan-ai/commit/f674274) | Repair loop in the orchestrator |
+| [`3421a2b`](https://github.com/lolo67fa/bunyan-ai/commit/3421a2b) | Tests view shows the repair history |
+| [`e29b106`](https://github.com/lolo67fa/bunyan-ai/commit/e29b106) | Protected real BA: backend, endpoints, access-code box in the UI |
+| [`be2e6c6`](https://github.com/lolo67fa/bunyan-ai/commit/be2e6c6) | Docs: README, SUBMISSION, architecture, DEPLOY, Developer and QA READMEs |
+
+**Tests and verification:**
+- Local: backend 315 passed; Architect 60; PM 56; BA 298 (+10 opt-in skipped); QA 11; React 26/26 and production build.
+- Repair loop: 13 tests, including real Chromium in English and Arabic (QA finds the defect, the repair changes `app.js`, the re-test passes 8/8).
+- Protected BA: 17 tests, replaying the real output of paid run 44769184001 through a stand-in client. No network, no new paid call.
+- Integer message: 4 tests in real Chromium. "2.5" in «الكمية» shows «يجب أن تكون الكمية عدداً صحيحاً»; decimals are still accepted.
+- Docker image: journeys EN / AR / bookings 3/3, and a real repair on the real-LLM library app (7/8 → `app.js` restored → 8/8).
+
+**Approval and status:**
+- Merged by Ghala on Nov 21 ("Merge both").
+- **Not deployed:** production is still `main` @ `296099e` (deployment `9e873d4b`), with mock mode and the access codes off. Deploying is a separate decision.
+
 ---
 
 ## 4. Claude Code sessions: instructions and outcomes
@@ -251,7 +303,8 @@ Only Ghala's instructions are summarised. No session content, credentials or tok
 | Nov 20 | Final execution and delivery: PM adoption, Architect gaps, acceptance tests, final PR, docs | done | `90e7d87`, `92681fb`, `19d12a3`, `dd85398`, PR #16 |
 | Nov 20 | Urgent: Safari shows raw JSON | fixed, deployed after approval | `858ce45`, `7619e18`, `f21686ee` |
 | Nov 21 | Merge the final PR; deploy final `main` | done | `296099e`, `9e873d4b` |
-| Nov 21 | Remaining features: repair loop, protected real BA, integer message | done, **open PR** | PR #17 |
+| Nov 21 | Remaining features: repair loop, protected real BA, integer message; keep production in mock mode; no paid calls; no merge or deploy without approval | done; PR #17 opened, CI green | PR #17 |
+| Nov 21 | "Merge both" (PRs #17 and #18) | merged | `fdcef1d`, `93086d2` |
 
 ---
 
@@ -262,12 +315,25 @@ They are a measure of final code, not of effort, design or review.
 
 | Member | Original assignment (`docs/team-roles.md`) | Delivered (verified) | PRs |
 |---|---|---|---|
-| **Ghala Alshreef** | Business Analyst, team lead, docs | Business Analyst (6,414 lines); orchestrator (735); most of the backend API layer (`main.py` 543, `security.py` 385, `artifacts.py` 89); integration of every component; Docker, Railway, CI, security, guest mode; release and docs | #1, #2, #6, #8, #15, #16 (and #17 open) |
+| **Ghala Alshreef** | Business Analyst, team lead, docs | Business Analyst (6,414 lines); orchestrator (735 at the release, 839 after PR #17); repair loop, protected real BA access and integer message (PR #17); most of the backend API layer (`main.py` 543, `security.py` 385, `artifacts.py` 89); integration of every component; Docker, Railway, CI, security, guest mode; release and docs | #1, #2, #6, #8, #15, #16, #17, #18 |
 | **Naifah** | Software Architect, frontend UI/UX | Software Architect agent and `architecture.json` contract v0.3.0 (2,495 lines of `backend/agents/architect`) | #4 |
 | **Yara** | Developer Agent, CRUD template | Developer agent and the CRUD template (all of `backend/agents/developer`; 129 of 152 lines of `templates/crud`), CI smoke test | #10 |
 | **Sara** | QA Tester | 8-check Playwright suite, QA agent, `test_report.json` contract, QA v0.2; reported the AC-2 conflict | #7 |
 | **Jood** | Project Manager, React frontend | React frontend (7,740 lines of `frontend/src`), API alignment, visual identity, Riyadh landing and platform theme, Project Manager agent (1,577 lines) | #3, #9, #11, #12, #13, #14 |
 | **Alanoud** | Backend, orchestration, GitHub Actions | FastAPI application, Pydantic API contracts, JSON storage, BA endpoint, input validation, first CI pipeline (`backend/schemas` 64 of 79 lines) | #5 |
+
+After PR #17 (`main` @ `93086d2`), the `git blame` figures that changed:
+
+| Area | Lines on `main` |
+|---|---|
+| `backend/orchestrator` | Ghala 839 |
+| `backend/main.py` | Ghala 596, Alanoud 81 |
+| `backend/llm_access.py` (new) | Ghala 287 |
+| `backend/agents/developer/repair.py` | Yara 39, Ghala 63 |
+| `backend/agents/project_manager` | Jood 1,577, Ghala 203 |
+| `backend/agents/architect` | Naifah 2,495, Ghala 231, and 89 from the unattributed `d46a166` |
+| `tests/` | Ghala 3,869, Sara 1,019, Alanoud 244, Yara 31 |
+| `frontend/src` | Jood 7,737, Ghala 261 |
 
 Ownership that changed:
 
