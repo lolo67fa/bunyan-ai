@@ -71,6 +71,7 @@ member. The team is six people.
 | K | Real-LLM verification and cost control | Designed the safeguards, approved each paid run | Workflow runs 42211456095, 44716341099, 44725920842, 44769184001 | Verified |
 | L | Final delivery and release | Release manager | PR #16 (`296099e`), `docs/SUBMISSION.md`, `docs/user-guide-ar.md`, Railway deployment `9e873d4b` | Verified |
 | M | Post-release capabilities: deterministic repair loop, protected real BA access, integer validation message (Architect contract v0.3.2) | Specified, decided and approved; implemented (AI-assisted under her direction) | PR #17, merged as `fdcef1d` (section 3.M) | Verified |
+| N | Secure AI capabilities: experimental AI repair, hardened protected BA, $5 cumulative budget; release of `main` @ `12a0dbf` | Specified, decided budget and approvals; implemented (AI-assisted under her direction) | PRs #22, #23 (merge `12a0dbf`), deployment `d0d16d96` (section 3.N) | Verified |
 
 ---
 
@@ -274,6 +275,18 @@ deliverable is on GitHub. Her constraints:
 - Merged by Ghala on Nov 21 ("Merge both").
 - **Not deployed:** production is still `main` @ `296099e` (deployment `9e873d4b`), with mock mode and the access codes off. Deploying is a separate decision.
 
+### N. PRs #22 and #23: secure AI capabilities and the cumulative budget (merged Nov 21)
+
+| Contribution | Evidence | Confidence |
+|---|---|---|
+| Experimental AI repair (`BUNYAN_REPAIR=llm`, off by default). Restore runs first. Then one bounded Claude request, for owners with an access code only. App files and QA messages are treated as untrusted data. The output is schema-constrained, then validated (allowlisted files, unique snippets, no network or dynamic code, approved configuration unchanged) before anything is written. One request at a time. | `36eec0e`, `cf44336`, `58d1b8d`; `tests/test_llm_repair.py` (26, one in real Chromium) | Verified |
+| Protected BA hardening. Audit logs carry code labels only. Reservations are per kind, under one lock. A clarification-round test. | `1f70617` | Verified |
+| Jood's PM and the Tests view mark AI repairs; the UI journey was tested end to end with a stand-in model | `945faf2` | Verified |
+| $5 cumulative experiment budget. A ledger on the volume, in integer micro-dollars, never reset. The worst case is reserved before each request; real usage is booked after; unknown cost books the worst case. Fail closed. Admin summary. 22 tests. | `563d695` | Verified |
+| Budget decision approved by Ghala: $5 total, $1.2919 estimated past spend (5 paid requests in GitHub Actions), $3.7081 left; recorded as an estimate subject to reconciliation | `cd1504f`, `docs/AI-RELEASE-PLAN.md` | Verified |
+| Release: PR #23 merged (`12a0dbf`, PR #22 included); deployed to Railway (`d0d16d96`) with every paid feature off; old projects and cookies checked live | Railway deployment list; live checks | Verified |
+| Team PRs #11 and #13 (Jood) verified as fully integrated (commits in `main`, files identical or developed further by Jood in #14) and closed with explanatory comments; branches kept | PR comments | Verified |
+
 ---
 
 ## 4. Claude Code sessions: instructions and outcomes
@@ -305,6 +318,8 @@ Only Ghala's instructions are summarised. No session content, credentials or tok
 | Nov 21 | Merge the final PR; deploy final `main` | done | `296099e`, `9e873d4b` |
 | Nov 21 | Remaining features: repair loop, protected real BA, integer message; keep production in mock mode; no paid calls; no merge or deploy without approval | done; PR #17 opened, CI green | PR #17 |
 | Nov 21 | "Merge both" (PRs #17 and #18) | merged | `fdcef1d`, `93086d2` |
+| Nov 21 | Final AI capabilities: protected BA, AI repair, PRs #11 and #13 | done; PR #22; #11 and #13 closed as integrated | PR #22 |
+| Nov 21 | $5 cumulative budget; then approve $1.2919 starting debit; merge and deploy with paid AI off | done | PR #23, `12a0dbf`, deployment `d0d16d96` |
 
 ---
 
@@ -315,8 +330,8 @@ They are a measure of final code, not of effort, design or review.
 
 | Member | Original assignment (`docs/team-roles.md`) | Delivered (verified) | PRs |
 |---|---|---|---|
-| **Ghala Alshreef** | Business Analyst, team lead, docs | Business Analyst (6,414 lines); orchestrator (735 at the release, 839 after PR #17); repair loop, protected real BA access and integer message (PR #17); most of the backend API layer (`main.py` 543, `security.py` 385, `artifacts.py` 89); integration of every component; Docker, Railway, CI, security, guest mode; release and docs | #1, #2, #6, #8, #15, #16, #17, #18 |
-| **Naifah** | Software Architect, frontend UI/UX | Software Architect agent and `architecture.json` contract v0.3.0 (2,495 lines of `backend/agents/architect`) | #4 |
+| **Ghala Alshreef** | Business Analyst, team lead, docs | Business Analyst (6,414 lines); orchestrator (735 at the release, 839 after PR #17); repair loop, protected real BA access and integer message (PR #17); most of the backend API layer (`main.py` 543, `security.py` 385, `artifacts.py` 89); integration of every component; Docker, Railway, CI, security, guest mode; release and docs | #1, #2, #6, #8, #15, #16, #17, #18, #19, #22, #23 |
+| **Naifah** | Software Architect, frontend UI/UX | Software Architect agent and `architecture.json` contract v0.3.0 (2,495 lines of `backend/agents/architect`). Open for review on Nov 21: the Bunyan identity for generated apps, and frontend fixes from her identity review | #4; open: #20, #21 |
 | **Yara** | Developer Agent, CRUD template | Developer agent and the CRUD template (all of `backend/agents/developer`; 129 of 152 lines of `templates/crud`), CI smoke test | #10 |
 | **Sara** | QA Tester | 8-check Playwright suite, QA agent, `test_report.json` contract, QA v0.2; reported the AC-2 conflict | #7 |
 | **Jood** | Project Manager, React frontend | React frontend (7,740 lines of `frontend/src`), API alignment, visual identity, Riyadh landing and platform theme, Project Manager agent (1,577 lines) | #3, #9, #11, #12, #13, #14 |
