@@ -56,6 +56,7 @@ const STOPPED = {
   invalid_repair_output: 'أنتج الإصلاح ملفات غير صالحة، فتوقف دون إعادة الفحوصات.',
   repair_error: 'تعذّر تنفيذ الإصلاح، فتوقف دون إعادة الفحوصات.',
   qa_blocked: 'تعذّر إعادة الاختبار بعد الإصلاح.',
+  repair_unavailable: 'لم يُطلب إصلاح بالذكاء الاصطناعي (لا رمز وصول صالح، أو انتهت الحصة أو الميزانية).',
 };
 
 /**
@@ -74,8 +75,11 @@ export function repairSteps(project) {
       return { key: `t${h.attempt}`, label, result, tone: qa.status === 'passed' ? 'done' : qa.status === 'failed' ? 'failed' : 'waiting' };
     }
     const files = (h.changed_files ?? []).map((c) => c.file).join('، ');
-    const result = h.result === 'changed' ? `غيّر المطوّر: ${files}`
-      : h.result === 'no_change' ? 'لم يتغير أي ملف' : `فشل الإصلاح${h.reason ? `: ${h.reason}` : ''}`;
+    const ai = h.strategy === 'llm_repair' ? ' (ذكاء اصطناعي)' : '';
+    const result = h.result === 'changed' ? `غيّر المطوّر${ai}: ${files}`
+      : h.result === 'no_change' ? 'لم يتغير أي ملف'
+        : h.result === 'rejected' ? 'رُفض اقتراح الإصلاح ولم يُطبَّق'
+          : h.result === 'unavailable' ? 'لم يُطلب إصلاح بالذكاء الاصطناعي' : `فشل الإصلاح${h.reason ? `: ${h.reason}` : ''}`;
     return { key: `r${h.attempt}`, label: `محاولة الإصلاح ${h.attempt} من ${repair.max_repairs ?? 2}`, result,
       tone: h.result === 'changed' ? 'neutral' : 'failed' };
   });

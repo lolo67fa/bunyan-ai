@@ -100,3 +100,15 @@ test('repair history: only the steps the backend recorded, and no repair claimed
   assert.equal(none.rows[1].result, 'لم يتغير أي ملف');
   assert.match(none.stopped, /لم يُحسب إصلاحاً/);
 });
+
+test('repair history marks AI repairs and rejected proposals', async () => {
+  const { repairSteps } = await import('../src/lib/qa.js');
+  const r = repairSteps({ repair: { stopped: 'invalid_repair_output', history: [
+    { attempt: 0, step: 'test', qa: { status: 'failed', passed: 7, total: 8, failed: [{}] } },
+    { attempt: 1, step: 'repair', result: 'changed', strategy: 'llm_repair', changed_files: [{ file: 'app.js' }] },
+    { attempt: 1, step: 'test', qa: { status: 'failed', passed: 7, total: 8, failed: [{}] } },
+    { attempt: 2, step: 'repair', result: 'rejected', reason: 'outside the allowlist' },
+  ] } });
+  assert.equal(r.rows[1].result, 'غيّر المطوّر (ذكاء اصطناعي): app.js');
+  assert.equal(r.rows[3].result, 'رُفض اقتراح الإصلاح ولم يُطبَّق');
+});
