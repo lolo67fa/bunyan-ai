@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import contextvars
 import json
+import logging
 import os
 import threading
 import time
@@ -39,6 +40,8 @@ from backend import storage
 
 # USD per million tokens (input, output). Same table as the paid live test.
 from backend.agents.business_analyst.live_check import PRICES
+
+logger = logging.getLogger("uvicorn.error").getChild("bunyan.llm_access")
 
 STATE_FILE = "llm_access.json"
 MAX_FAILURES = 8          # wrong codes per address ...
@@ -115,7 +118,11 @@ def check_configuration() -> None:
         raise RuntimeError(f"BUNYAN_LLM_DAILY_BUDGET_USD ({budget}) is below the cost of one request "
                            f"in the worst case ({worst_case_usd()} USD)")
     _int_env("BUNYAN_LLM_MAX_PER_CODE_PER_DAY", 3)
+    _int_env("BUNYAN_LLM_REPAIRS_PER_CODE_PER_DAY", 3)
     _float_env("BUNYAN_LLM_ACCESS_HOURS", 12)
+    logger.info("Protected real analyst: on (model %s, %d codes, %s analyses per code per day, budget %.2f USD per day, "
+                "worst case %.2f USD per analysis)", s.model, len(_codes()),
+                _int_env("BUNYAN_LLM_MAX_PER_CODE_PER_DAY", 3), budget, worst_case_usd())
 
 
 @dataclass
@@ -186,11 +193,15 @@ class LlmAccess:
         with self._lock:
             if label is None:
                 self._failures[client].append(now)
+                # Audit without sensitive data: never the code, the session or the address.
+                logger.warning("Protected real analyst: wrong access code (%d recent failures from this address)",
+                               len(self._failures[client]))
                 raise HTTPException(403, "رمز الوصول غير صحيح.")
             data = self._read()
             data["grants"][user] = {"label": label,
                                     "expires": time.time() + _float_env("BUNYAN_LLM_ACCESS_HOURS", 12) * 3600}
             self._write(data)
+        logger.info("Protected real analyst: access granted for code '%s'", label)
         return label
 
     def status(self, user: Optional[str]) -> Dict[str, Any]:
@@ -206,30 +217,41 @@ class LlmAccess:
 
     # ----- spending -----
 
-    def reserve(self, user: str) -> Ticket:
-        """Count one paid analysis for the user's code and reserve its worst-case cost, or raise 429."""
+    def reserve(self, user: str, kind: str = "analysis", worst: Optional[float] = None) -> Ticket:
+        """Count one paid request (an analysis, or an AI repair) for the user's code and reserve its
+        worst-case cost, or raise. All checks and the reservation happen under one lock, so requests
+        in parallel cannot pass a limit together."""
         label = self.label_for(user)
         if label is None:
             raise HTTPException(403, "التحليل الحقيقي يحتاج رمز وصول صالحاً.")
-        per_code = _int_env("BUNYAN_LLM_MAX_PER_CODE_PER_DAY", 3)
+        if kind == "repair":
+            per_code, counter = _int_env("BUNYAN_LLM_REPAIRS_PER_CODE_PER_DAY", 3), "repairs_per_code"
+            limit_message = "استُنفدت محاولات الإصلاح بالذكاء الاصطناعي لهذا الرمز اليوم."
+        else:
+            per_code, counter = _int_env("BUNYAN_LLM_MAX_PER_CODE_PER_DAY", 3), "per_code"
+            limit_message = f"استُخدم هذا الرمز {per_code} مرات اليوم، وهو الحد اليومي. جرّب غداً."
         budget = _float_env("BUNYAN_LLM_DAILY_BUDGET_USD", 2.0)
-        worst = worst_case_usd()
+        worst = worst if worst is not None else worst_case_usd()
         with self._lock:
             data = self._read()
-            if data["per_code"].get(label, 0) >= per_code:
-                raise HTTPException(429, f"استُخدم هذا الرمز {per_code} مرات اليوم، وهو الحد اليومي. جرّب غداً.")
+            counts = data.setdefault(counter, {})
+            if counts.get(label, 0) >= per_code:
+                raise HTTPException(429, limit_message)
             if data["spent_usd"] + self._reserved + worst > budget:
+                logger.warning("Protected real analyst: daily budget reached (%.4f spent, %.2f reserved, %.2f budget)",
+                               data["spent_usd"], self._reserved, budget)
                 raise HTTPException(429, "بلغت ميزانية التحليل الحقيقي لهذا اليوم حدها. جرّب غداً.")
-            data["per_code"][label] = data["per_code"].get(label, 0) + 1
+            counts[label] = counts.get(label, 0) + 1
             data["calls"] += 1
             self._reserved += worst
             self._write(data)
+        logger.info("Protected real analyst: %s reserved for code '%s' (worst case %.2f USD)", kind, label, worst)
         return Ticket(user, label, worst)
 
-    def settle(self, ticket: Ticket, usage: Optional[Dict[str, Any]], model: Optional[str]) -> None:
-        """Replace the reservation with the real cost (the worst case if usage is unknown)."""
+    def settle(self, ticket: Ticket, usage: Optional[Dict[str, Any]], model: Optional[str]) -> float:
+        """Replace the reservation with the real cost (the worst case if usage is unknown). Returns the cost."""
         if ticket.settled:
-            return
+            return 0.0
         cost = ticket.reserved_usd
         if usage and model in PRICES and usage.get("input_tokens") is not None and usage.get("output_tokens") is not None:
             price_in, price_out = PRICES[model]
@@ -239,7 +261,11 @@ class LlmAccess:
             data["spent_usd"] = round(data["spent_usd"] + cost, 4)
             self._reserved = max(0.0, self._reserved - ticket.reserved_usd)
             self._write(data)
+            spent = data["spent_usd"]
         ticket.settled = True
+        logger.info("Protected real analyst: cost booked for code '%s': %.4f USD (%s); spent today %.4f USD",
+                    ticket.label, cost, "real usage" if cost != ticket.reserved_usd else "worst case", spent)
+        return cost
 
     def release_unused(self, ticket: Ticket) -> None:
         """The request never reached the model: give the reservation back (the count stays)."""

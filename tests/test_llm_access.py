@@ -199,3 +199,34 @@ def test_guest_mode_still_refuses_a_global_real_analyst(site, monkeypatch):
     with pytest.raises(RuntimeError, match="BA_MODE=mock"):
         with TestClient(main.app):
             pass
+
+
+def test_clarification_round_with_the_real_analyst(site, monkeypatch):
+    """The model asks questions, the tester answers, the model is called again; both calls count."""
+    samples = ROOT / "backend/agents/business_analyst/samples/outputs"
+    texts = [(samples / "vague_idea_en.requirements.json").read_text(encoding="utf-8"),
+             (samples / "task_manager_en.requirements.json").read_text(encoding="utf-8")]
+    calls = []
+
+    class Sequenced(StandInAnthropic):
+        def _stream(self, **request):
+            calls.append(request)
+            message = SimpleNamespace(stop_reason="end_turn", stop_details=None, _request_id="req_offline",
+                                      model="claude-opus-5-5", usage=SimpleNamespace(input_tokens=6000, output_tokens=9000),
+                                      content=[SimpleNamespace(type="text", text=texts[len(calls) - 1])])
+            return _Ctx(message)
+
+    fake = Sequenced()
+    monkeypatch.setattr(analyst, "_default_llm_generator", lambda d, s: run_direct(d, s, client=fake))
+    alice = browser()
+    unlock(alice)
+    pid = alice.post("/projects", json={"prompt": "I want an app to keep track of my work stuff and things"}).json()["project_id"]
+    project = alice.get(f"/projects/{pid}").json()
+    assert project["status"] == "awaiting_clarification" and project["analysis"]["mode"] == "llm"
+    questions = project["requirements"]["clarification_questions"]
+    answers = {q["id"]: (q.get("suggested_default") or "Tasks with title, due date, priority and status") for q in questions}
+    assert alice.post(f"/projects/{pid}/answers", json={"answers": answers}).status_code == 200
+    project = alice.get(f"/projects/{pid}").json()
+    assert project["status"] == "awaiting_approval" and len(calls) == 2
+    assert alice.get("/llm-access").json()["remaining_today"] == 1  # both analyses counted on the code
+    assert spent()["spent_usd"] == pytest.approx(2 * (6000 * 4 / 1e6 + 9000 * 20 / 1e6))
