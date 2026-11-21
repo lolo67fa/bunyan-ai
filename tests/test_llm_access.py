@@ -12,7 +12,7 @@ from types import SimpleNamespace
 import pytest
 from fastapi.testclient import TestClient
 
-from backend import llm_access, main, security, storage
+from backend import llm_access, llm_budget, main, security, storage
 from backend.agents.business_analyst import analyst
 from backend.agents.business_analyst.direct_llm import run_direct
 
@@ -62,7 +62,7 @@ def site(monkeypatch):
         "BA_LLM_PROVIDER": "anthropic", "BA_LLM_MODEL": "claude-opus-5-5", "BA_LLM_BACKEND": "direct",
         "BA_MAX_RETRIES": "0", "BA_SDK_MAX_RETRIES": "0", "BA_FALLBACKS": "off", "BA_MAX_TOKENS": "32000",
         "ANTHROPIC_API_KEY": "sk-ant-offline-test-value-never-sent",
-        "BUNYAN_LLM_DAILY_BUDGET_USD": "2", "BUNYAN_LLM_MAX_PER_CODE_PER_DAY": "3",
+        "BUNYAN_LLM_DAILY_BUDGET_USD": "2", "BUNYAN_LLM_MAX_PER_CODE_PER_DAY": "3", "BUNYAN_TOTAL_LLM_BUDGET_USD": "5.00", "BUNYAN_LLM_BUDGET_STARTING_SPENT_USD": "0",
         "BUNYAN_MAX_PROJECTS_PER_USER_PER_DAY": "10",
     }
     for k, v in env.items():

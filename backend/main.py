@@ -297,9 +297,10 @@ def enforce_limits(user, new_project=False, analysis=False, client="unknown"):
     security.limits.reserve(user, new_project=new_project, llm=llm or coded, client=client)
     if not (llm or coded):
         return False
-    if not coded:
-        return LlmSlot()
     try:
+        if not coded:
+            # BA_MODE=llm for logged-in testers: the same cumulative budget (llm_budget.py) applies.
+            return LlmSlot(llm_access.access.reserve(user, label_override=f"login:{user}"))
         return LlmSlot(llm_access.access.reserve(user))
     except HTTPException:
         security.limits.release()
@@ -552,6 +553,21 @@ def create_project(data: ProjectRequest, background_tasks: BackgroundTasks, user
     }
     save_project(project)
     return start_analysis(project, background_tasks, "initial", llm_slot=llm_slot)
+
+
+@app.get("/admin/llm-budget")
+def admin_llm_budget(request: Request, client=Depends(current_client)):
+    """Cumulative AI budget for the project lead: amounts and counts per access-code label only
+    (no codes, prompts, sessions or addresses). HTTP Basic login of a user listed in BUNYAN_ADMINS."""
+    admins = {a.strip() for a in os.environ.get("BUNYAN_ADMINS", "").split(",") if a.strip()}
+    if not admins:
+        raise HTTPException(404, "Not found")
+    name = security.authenticator.authenticate(request.headers.get("authorization"), client)
+    if name not in admins:
+        raise HTTPException(403, "Not allowed")
+    from backend import llm_budget
+
+    return llm_budget.ledger.summary()
 
 
 @app.get("/llm-access")

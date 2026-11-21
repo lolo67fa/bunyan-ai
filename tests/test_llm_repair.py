@@ -13,7 +13,7 @@ from types import SimpleNamespace
 import pytest
 from fastapi.testclient import TestClient
 
-from backend import llm_access, main, security, storage
+from backend import llm_access, llm_budget, main, security, storage
 from backend.agents.developer import generator, llm_repair
 from backend.agents.developer import repair as restore_module
 from backend.orchestrator import pipeline, run_pipeline
@@ -89,11 +89,12 @@ def authorised(monkeypatch):
         "BUNYAN_LLM_ACCESS": "codes", "BUNYAN_LLM_ACCESS_CODES": f"club:{security.hash_password(CODE, 1000)}",
         "BA_LLM_PROVIDER": "anthropic", "BA_LLM_MODEL": "claude-opus-5-5", "BA_LLM_BACKEND": "direct",
         "BA_MAX_RETRIES": "0", "BA_SDK_MAX_RETRIES": "0", "BA_FALLBACKS": "off", "BA_MAX_TOKENS": "32000",
-        "ANTHROPIC_API_KEY": SECRET_KEY, "BUNYAN_LLM_DAILY_BUDGET_USD": "2", "BUNYAN_REPAIR": "llm",
+        "ANTHROPIC_API_KEY": SECRET_KEY, "BUNYAN_LLM_DAILY_BUDGET_USD": "2", "BUNYAN_REPAIR": "llm", "BUNYAN_TOTAL_LLM_BUDGET_USD": "5.00", "BUNYAN_LLM_BUDGET_STARTING_SPENT_USD": "0",
     }
     for k, v in env.items():
         monkeypatch.setenv(k, v)
     llm_access.access.reset()
+    llm_budget.ledger.reset()
     llm_access.access.grant(OWNER, CODE, "203.0.113.7")
     yield
     llm_access.access.reset()
