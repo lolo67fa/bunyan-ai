@@ -91,15 +91,19 @@ def _check_password(password: str, stored: str) -> bool:
 
 def load_users() -> Dict[str, str]:
     """Parse BUNYAN_USERS into {name: stored hash}. Raises RuntimeError on a malformed entry."""
+    return parse_hashed_entries(os.environ.get("BUNYAN_USERS", ""), "BUNYAN_USERS")
+
+
+def parse_hashed_entries(raw: str, variable: str) -> Dict[str, str]:
+    """Parse "name:pbkdf2:..." entries (comma separated) into {name: stored hash}."""
     users: Dict[str, str] = {}
-    raw = os.environ.get("BUNYAN_USERS", "")
     for entry in raw.replace("\n", ",").split(","):
         entry = entry.strip()
         if not entry:
             continue
         name, _, stored = entry.partition(":")
         if not name or not name.replace("-", "").replace("_", "").replace(".", "").isalnum() or not stored.startswith("pbkdf2:"):
-            raise RuntimeError("BUNYAN_USERS has a malformed entry; create entries with "
+            raise RuntimeError(f"{variable} has a malformed entry; create entries with "
                                "'python -m backend.security hash-password <name>'")
         users[name] = stored
     return users

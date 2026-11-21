@@ -13,5 +13,7 @@ export const {
   getPreviewHtml,
   previewUrl,
   downloadUrl,
+  getLlmAccess,
+  unlockLlmAccess,
   MODE,
 } = api;

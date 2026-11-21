@@ -121,3 +121,7 @@ export const previewUrl = (id) => `${BASE}/projects/${encodeURIComponent(id)}/pr
 export const downloadUrl = (id) => `${BASE}/projects/${encodeURIComponent(id)}/download`;
 
 export const MODE = 'http';
+
+/** The protected real analyst: {available, enabled, remaining_today?}. */
+export const getLlmAccess = async () => request('/llm-access');
+export const unlockLlmAccess = async (code) => request('/llm-access', { method: 'POST', body: JSON.stringify({ code }) });

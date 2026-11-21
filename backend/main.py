@@ -17,7 +17,7 @@ from starlette.concurrency import run_in_threadpool
 
 from backend.schemas.contracts import ProjectRequest, ApprovalRequest, AnswersRequest
 from backend.storage import save_project, load_project, project_dir, list_project_ids
-from backend import artifacts, security
+from backend import artifacts, llm_access, security
 from backend.agents.architect import ArchitectureError, build_architecture
 from backend.agents.business_analyst.analyst import analyze
 from backend.agents.business_analyst.config import ConfigError, get_settings as get_ba_settings
@@ -98,6 +98,7 @@ def check_ba_configuration():
 async def lifespan(app):
     security.check_configuration()
     check_ba_configuration()
+    llm_access.check_configuration()
     recover_interrupted_projects()
     yield
 
@@ -163,7 +164,7 @@ async def access_control(request: Request, call_next):
 
 def is_api_path(path: str) -> bool:
     """Routes that read or change a guest's projects. Everything else is the public React app."""
-    return path == "/projects" or path.startswith("/projects/")
+    return path == "/projects" or path.startswith("/projects/") or path == "/llm-access"
 
 
 _ERROR_TITLES = {401: "تسجيل الدخول مطلوب", 403: "الطلب مرفوض", 404: "الصفحة غير موجودة",
@@ -244,8 +245,30 @@ def current_client(request: Request):
     return getattr(request.state, "client", "unknown")
 
 
+class LlmSlot:
+    """A reserved paid analysis: the site-wide concurrency slot and, with an access code, the
+    code's daily use and the reserved worst-case cost (backend/llm_access.py)."""
+
+    def __init__(self, ticket=None):
+        self.ticket = ticket
+
+    def settings(self):
+        """The real analyst for a guest who unlocked it; otherwise the configured BA_MODE."""
+        return get_ba_settings("llm") if self.ticket is not None else get_ba_settings()
+
+    def release(self):
+        security.limits.release()
+        if self.ticket is not None:
+            llm_access.access.release_unused(self.ticket)  # no-op once the real cost is settled
+
+
+def release_slot(slot):
+    if slot:
+        slot.release()
+
+
 def enforce_limits(user, new_project=False, analysis=False, client="unknown"):
-    """Rate and quota checks for a shared deployment. Returns True when an LLM slot was taken."""
+    """Rate and quota checks for a shared deployment. Returns an LlmSlot when a paid analysis is reserved."""
     if not security.shared_deployment():
         return False
     security.limits.check_rate(user, client)
@@ -257,8 +280,17 @@ def enforce_limits(user, new_project=False, analysis=False, client="unknown"):
         llm = False  # the analysis will fail with "ba_not_configured" without calling a model
     if llm and security.auth_mode() == "guest":
         raise HTTPException(403, "Real analysis is not available to guests.")  # startup refuses this too
-    security.limits.reserve(user, new_project=new_project, llm=llm, client=client)
-    return llm
+    coded = not llm and llm_access.access.label_for(user) is not None  # a guest who entered an access code
+    security.limits.reserve(user, new_project=new_project, llm=llm or coded, client=client)
+    if not (llm or coded):
+        return False
+    if not coded:
+        return LlmSlot()
+    try:
+        return LlmSlot(llm_access.access.reserve(user))
+    except HTTPException:
+        security.limits.release()
+        raise
 
 
 @app.get("/health", include_in_schema=False)
@@ -395,7 +427,7 @@ def start_analysis(project, background_tasks, kind, answers=None, feedback=None,
     analysis runs in the background; the frontend already polls that status.
     """
     try:
-        settings = get_ba_settings()
+        settings = llm_slot.settings() if llm_slot else get_ba_settings()
     except ConfigError:
         settings = None  # finish_analysis reports it as "ba_not_configured"
     # The endpoints have checked this status (awaiting_approval for feedback,
@@ -417,8 +449,7 @@ def start_analysis(project, background_tasks, kind, answers=None, feedback=None,
     try:
         return finish_analysis(project, answers=answers, feedback=feedback, settings=settings)
     finally:
-        if llm_slot:
-            security.limits.release()
+        release_slot(llm_slot)
 
 
 def run_analysis_in_background(project_id, answers, feedback, llm_slot=False):
@@ -426,12 +457,17 @@ def run_analysis_in_background(project_id, answers, feedback, llm_slot=False):
         project = load_project(project_id)
         if project is None or project.get("status") != "analyzing":
             return
-        finish_analysis(project, answers=answers, feedback=feedback)
+        try:
+            settings = llm_slot.settings() if llm_slot else None
+        except ConfigError:
+            settings = None
+        ticket = llm_slot.ticket if llm_slot else None
+        with llm_access.usage_recorder(ticket):
+            finish_analysis(project, answers=answers, feedback=feedback, settings=settings)
     except Exception:  # noqa: BLE001 - storage itself failed; recovery on restart handles the project
         logger.exception("Business Analyst: could not save the analysis of project %s", project_id)
     finally:
-        if llm_slot:
-            security.limits.release()
+        release_slot(llm_slot)
 
 
 def finish_analysis(project, answers=None, feedback=None, settings=None):
@@ -505,6 +541,24 @@ def create_project(data: ProjectRequest, background_tasks: BackgroundTasks, user
     return start_analysis(project, background_tasks, "initial", llm_slot=llm_slot)
 
 
+@app.get("/llm-access")
+def get_llm_access(user=Depends(current_user)):
+    """Whether this site offers the protected real analyst, and whether this session has unlocked it."""
+    return llm_access.access.status(user)
+
+
+@app.post("/llm-access")
+def unlock_llm_access(data: dict, user=Depends(current_user), client=Depends(current_client)):
+    """Unlock the real analyst for this browser session with an access code."""
+    if not user:
+        raise HTTPException(403, "Access codes need a guest or login session.")
+    code = data.get("code") if isinstance(data, dict) else None
+    if not isinstance(code, str) or not 4 <= len(code) <= 200:
+        raise HTTPException(422, "رمز الوصول غير صالح.")
+    llm_access.access.grant(user, code, client)
+    return llm_access.access.status(user)
+
+
 @app.get("/projects/{project_id}")
 def get_project_pipeline(project_id: uuid.UUID, user=Depends(current_user)):
     return get_existing_project(project_id, user)
@@ -520,8 +574,7 @@ def approve_project(
     with _approval_lock:
         project = get_existing_project(project_id, user)
         if project["status"] != "awaiting_approval":
-            if llm_slot:
-                security.limits.release()
+            release_slot(llm_slot)
             raise HTTPException(status_code=409, detail="Project is not ready for approval")
 
         if data.approved:

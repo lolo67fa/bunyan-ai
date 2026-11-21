@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { createProject } from '../api/client.js';
+import { useEffect, useState } from 'react';
+import { createProject, getLlmAccess, unlockLlmAccess } from '../api/client.js';
 import { goToProject } from '../hooks/useHashRoute.js';
 import { rememberProject } from '../lib/prefs.js';
 import { takeDraft } from '../project/draft.js';
@@ -83,6 +83,8 @@ export default function NewProjectPage() {
           ))}
         </div>
 
+        <LlmAccess />
+
         <div className="page-head" style={{ alignItems: 'center' }}>
           <details className="disclosure">
             <summary>ما الذي يمكن لبُنيان بناؤه؟</summary>
@@ -101,5 +103,61 @@ export default function NewProjectPage() {
         لن نبدأ بناء أي شيء قبل موافقتك على المتطلبات.
       </p>
     </div>
+  );
+}
+
+/**
+ * The real analyst (Claude) is offered only when the server allows it with access codes, and
+ * only after a code is entered; everyone else uses the demo analyst. The server enforces it.
+ */
+function LlmAccess() {
+  const [status, setStatus] = useState(null);
+  const [code, setCode] = useState('');
+  const [message, setMessage] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    getLlmAccess().then((s) => alive && setStatus(s)).catch(() => alive && setStatus(null));
+    return () => { alive = false; };
+  }, []);
+
+  if (!status?.available) return null;
+  if (status.enabled) {
+    return (
+      <p className="small" data-testid="llm-enabled">
+        <strong>المحلّل الحقيقي (Claude) مفعّل لهذه الجلسة.</strong>{' '}
+        <span className="muted">المتبقي اليوم بهذا الرمز: {status.remaining_today}</span>
+      </p>
+    );
+  }
+  async function unlock() {
+    setBusy(true);
+    setMessage('');
+    try {
+      setStatus(await unlockLlmAccess(code.trim()));
+      setCode('');
+    } catch (err) {
+      setMessage(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <details className="disclosure" data-testid="llm-access">
+      <summary>لديك رمز وصول للمحلّل الحقيقي؟</summary>
+      <div style={{ display: 'grid', gap: 'var(--bn-s2)' }}>
+        <p className="muted small" style={{ margin: 0 }}>
+          بدون رمز يعمل المحلّل التجريبي، وهو يفهم الأمثلة المعروفة فقط. الرمز يفعّل تحليل Claude لهذه الجلسة، بعدد محدود يومياً.
+        </p>
+        <div className="actions" style={{ gap: 'var(--bn-s2)' }}>
+          <input className="input" style={{ maxWidth: 260 }} type="password" autoComplete="off"
+            aria-label="رمز الوصول" value={code} onChange={(e) => setCode(e.target.value)} data-testid="llm-code" />
+          <button type="button" className="btn" disabled={busy || code.trim().length < 4} onClick={unlock}
+            data-testid="llm-unlock">تفعيل</button>
+        </div>
+        {message && <p className="field-error" role="alert">{message}</p>}
+      </div>
+    </details>
   );
 }
