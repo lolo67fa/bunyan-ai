@@ -54,3 +54,9 @@ The real-run tests are skipped when Node.js is not installed. The Appointment ru
 
 - How the orchestrator calls `run_qa()` and where it stores the report (Alanoud).
 - The report format is a proposal until the team agrees (see `tests/e2e/contract/TEST_REPORT.md` §5).
+
+## Re-tests after a repair
+
+The orchestrator calls `run_qa` again with `attempt=1` or `2` after a Developer repair that really
+changed files (`backend/orchestrator/pipeline.py`); the report's `run.attempt` must match, or the run
+is treated as blocked. The suite and the 8 checks are unchanged.

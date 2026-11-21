@@ -80,6 +80,23 @@ Data stays in the `bunyan-data` volume across `docker compose restart` and `down
 Size the service at 2 GB RAM (Chromium for QA plus the backend). Hobby plan: $5/month
 including $5 of usage; usage is about $10 per GB of RAM and $20 per vCPU per month.
 
+## Protected real Business Analyst for guests (optional)
+
+Keep `BUNYAN_AUTH=guest` and `BA_MODE=mock`, then set `BUNYAN_LLM_ACCESS=codes` with
+`BUNYAN_LLM_ACCESS_CODES` (hashed: `python -m backend.security hash-password <label>`),
+`BA_LLM_PROVIDER=anthropic`, `BA_LLM_MODEL=claude-opus-5-5`, `BA_LLM_BACKEND=direct`,
+`BA_MAX_RETRIES=0`, `BA_SDK_MAX_RETRIES=0`, `BA_FALLBACKS=off`, `BA_MAX_TOKENS=32000` and the
+`ANTHROPIC_API_KEY` secret. Limits: `BUNYAN_LLM_MAX_PER_CODE_PER_DAY` (3),
+`BUNYAN_MAX_LLM_ANALYSES_PER_DAY`, `BUNYAN_MAX_CONCURRENT_ANALYSES`, `BUNYAN_LLM_DAILY_BUDGET_USD` (2;
+each request reserves its worst case, 0.72 USD, before it is sent, then books the real usage).
+The server refuses to start with a weaker setting. Visitors without a code keep the mock analyst.
+Also set a monthly spend limit for the key's workspace in the Anthropic Console.
+
+## Repair loop
+
+`BUNYAN_REPAIR=restore` (default) runs at most two deterministic repairs with a real QA re-test after
+each real change; `off` disables it. No LLM and no cost.
+
 ## Switching on the real Business Analyst
 
 Set `BA_MODE=llm`, `BA_LLM_PROVIDER=anthropic`, `BA_LLM_MODEL=claude-opus-5-5`,
