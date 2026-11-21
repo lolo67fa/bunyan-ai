@@ -1,0 +1,4 @@
+# Project Manager Agent: rules mode + offline tests (no LLM, no API key).
+pydantic>=2.6,<3
+pytest>=8
+python-dotenv>=1.0

@@ -60,6 +60,9 @@ _VAGUE_TERMS_EN = (
 )
 _VAGUE_TERMS_AR = ("سهل", "بسهولة", "سريع", "بسرعة", "جميل", "مناسب", "بشكل جيد")
 
+# Wording of the "missing required fields" acceptance criterion (see _check_required_field_criteria).
+_REQUIRED_FIELD_MARKERS = ("required field", "حقل إلزامي")
+
 
 class _Model(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
@@ -388,6 +391,7 @@ class RequirementsDocument(_Model):
             for op in e.crud.enabled_operations():
                 if (e.name, op) not in covered:
                     raise ValueError(f"no functional requirement covers '{op}' on entity '{e.name}'")
+        self._check_required_field_criteria()
         stories_with_ac = {a.story_id for a in self.acceptance_criteria}
         for s in self.user_stories:
             if s.id not in stories_with_ac:
@@ -397,6 +401,31 @@ class RequirementsDocument(_Model):
             for op in e.crud.enabled_operations():
                 if (e.name, op) not in story_ops:
                     raise ValueError(f"no user story covers '{op}' on entity '{e.name}'")
+
+    def _check_required_field_criteria(self) -> None:
+        """A "missing required fields" criterion must not expect errors for pre-filled fields.
+
+        A required field with a default is never empty in the form, so QA cannot trigger
+        its required-field error. Checks criteria written in the agent's own wording
+        ("... required field: A, B" / "... حقل إلزامي: A، B").
+        """
+        story_entity = {s.id: s.entity for s in self.user_stories}
+        for entity in self.entities:
+            defaulted = {f.label for f in entity.fields if f.required and f.default is not None}
+            if not defaulted:
+                continue
+            for a in self.acceptance_criteria:
+                if story_entity.get(a.story_id) != entity.name or ":" not in a.then:
+                    continue
+                if not any(marker in a.then for marker in _REQUIRED_FIELD_MARKERS):
+                    continue
+                listed = {part.strip() for part in re.split(r"[,،]", a.then.rsplit(":", 1)[1])}
+                prefilled = sorted(listed & defaulted)
+                if prefilled:
+                    raise ValueError(
+                        f"{a.id} expects required-field errors for {prefilled}, but those fields have a "
+                        "default and cannot be left empty; list only required fields without a default"
+                    )
 
     # Convenience helpers for downstream agents -------------------------------------------
 

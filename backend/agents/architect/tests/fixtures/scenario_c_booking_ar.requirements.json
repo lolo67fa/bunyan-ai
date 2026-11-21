@@ -1,0 +1,405 @@
+{
+  "schema_version": "0.1.0-proposal",
+  "status": "ready_for_review",
+  "language": "ar",
+  "source_idea": "أبغى موقع بسيط لإدارة الحجوزات، أضيف حجز جديد، أشوف الحجوزات، أعدل الموعد وألغي الحجز.",
+  "app": {
+    "name": "إدارة الحجوزات",
+    "description": "تطبيق ويب بسيط لإضافة الحجوزات وعرضها وتعديل مواعيدها وإلغائها مع اسم العميل والتاريخ والوقت والحالة.",
+    "target_users": [
+      "أصحاب الأعمال الصغيرة",
+      "موظفو الاستقبال"
+    ]
+  },
+  "entities": [
+    {
+      "name": "Booking",
+      "label": "حجز",
+      "plural_label": "الحجوزات",
+      "description": "حجز لعميل في تاريخ ووقت محددين.",
+      "display_field": "customer_name",
+      "fields": [
+        {
+          "name": "customer_name",
+          "label": "اسم العميل",
+          "type": "string",
+          "required": true,
+          "unique": false,
+          "description": "",
+          "enum_values": null,
+          "reference_entity": null,
+          "default": null,
+          "validation": {
+            "min_length": 2,
+            "max_length": 100,
+            "min_value": null,
+            "max_value": null,
+            "pattern": null,
+            "date_constraint": null
+          }
+        },
+        {
+          "name": "date",
+          "label": "التاريخ",
+          "type": "date",
+          "required": true,
+          "unique": false,
+          "description": "",
+          "enum_values": null,
+          "reference_entity": null,
+          "default": null,
+          "validation": {
+            "min_length": null,
+            "max_length": null,
+            "min_value": null,
+            "max_value": null,
+            "pattern": null,
+            "date_constraint": "not_in_past"
+          }
+        },
+        {
+          "name": "time",
+          "label": "الوقت",
+          "type": "time",
+          "required": true,
+          "unique": false,
+          "description": "",
+          "enum_values": null,
+          "reference_entity": null,
+          "default": null,
+          "validation": {
+            "min_length": null,
+            "max_length": null,
+            "min_value": null,
+            "max_value": null,
+            "pattern": null,
+            "date_constraint": null
+          }
+        },
+        {
+          "name": "status",
+          "label": "حالة الحجز",
+          "type": "enum",
+          "required": true,
+          "unique": false,
+          "description": "",
+          "enum_values": [
+            "مؤكد",
+            "ملغى"
+          ],
+          "reference_entity": null,
+          "default": "مؤكد",
+          "validation": {
+            "min_length": null,
+            "max_length": null,
+            "min_value": null,
+            "max_value": null,
+            "pattern": null,
+            "date_constraint": null
+          }
+        },
+        {
+          "name": "notes",
+          "label": "ملاحظات",
+          "type": "text",
+          "required": false,
+          "unique": false,
+          "description": "",
+          "enum_values": null,
+          "reference_entity": null,
+          "default": null,
+          "validation": {
+            "min_length": null,
+            "max_length": 500,
+            "min_value": null,
+            "max_value": null,
+            "pattern": null,
+            "date_constraint": null
+          }
+        }
+      ],
+      "crud": {
+        "create": {
+          "enabled": true,
+          "details": ""
+        },
+        "read": {
+          "enabled": true,
+          "details": "",
+          "list_fields": [
+            "customer_name",
+            "date",
+            "time",
+            "status"
+          ],
+          "search_fields": [
+            "customer_name"
+          ],
+          "filter_fields": [
+            "status",
+            "date"
+          ],
+          "sort_field": "date",
+          "sort_direction": "asc"
+        },
+        "update": {
+          "enabled": true,
+          "details": ""
+        },
+        "delete": {
+          "enabled": true,
+          "details": "",
+          "requires_confirmation": true
+        }
+      }
+    }
+  ],
+  "functional_requirements": [
+    {
+      "id": "FR-1",
+      "entity": "Booking",
+      "category": "create",
+      "description": "يجب أن يسمح النظام للمستخدم بإنشاء حجز بإدخال: اسم العميل، التاريخ، الوقت، حالة الحجز، ملاحظات.",
+      "priority": "must"
+    },
+    {
+      "id": "FR-2",
+      "entity": "Booking",
+      "category": "read",
+      "description": "يجب أن يعرض النظام جميع الحجوزات في قائمة تظهر اسم العميل، التاريخ، الوقت، حالة الحجز مرتبة حسب التاريخ مع البحث حسب اسم العميل والتصفية حسب حالة الحجز، التاريخ.",
+      "priority": "must"
+    },
+    {
+      "id": "FR-3",
+      "entity": "Booking",
+      "category": "update",
+      "description": "يجب أن يسمح النظام للمستخدم بتعديل أي حقل في سجل موجود من الحجوزات وحفظ التعديلات.",
+      "priority": "must"
+    },
+    {
+      "id": "FR-4",
+      "entity": "Booking",
+      "category": "delete",
+      "description": "يجب أن يسمح النظام للمستخدم بحذف حجز بعد تأكيد العملية في نافذة تأكيد.",
+      "priority": "must"
+    },
+    {
+      "id": "FR-5",
+      "entity": "Booking",
+      "category": "validation",
+      "description": "يجب أن يرفض النظام حفظ حجز ما لم: يُدخل اسم العميل، يحتوي اسم العميل على 2 أحرف على الأقل، لا يتجاوز اسم العميل 100 حرفاً، يُدخل التاريخ، يكون التاريخ اليوم أو بعده، يُدخل الوقت، يُدخل حالة الحجز، لا يتجاوز ملاحظات 500 حرفاً.",
+      "priority": "must"
+    },
+    {
+      "id": "FR-6",
+      "entity": "Booking",
+      "category": "update",
+      "description": "يجب أن يسمح النظام للمستخدم بإلغاء الحجز بتغيير حالته إلى \"ملغى\" مع بقاء الحجز الملغى في القائمة.",
+      "priority": "must"
+    },
+    {
+      "id": "FR-7",
+      "entity": null,
+      "category": "persistence",
+      "description": "يجب أن يحفظ النظام جميع السجلات في localStorage في المتصفح بحيث تبقى بعد إعادة تحميل الصفحة.",
+      "priority": "must"
+    }
+  ],
+  "user_stories": [
+    {
+      "id": "US-1",
+      "role": "مسؤول الحجوزات",
+      "goal": "أضيف سجلاً جديداً إلى الحجوزات",
+      "benefit": "أحتفظ بالبيانات في مكان واحد",
+      "entity": "Booking",
+      "operation": "create",
+      "requirement_ids": [
+        "FR-1",
+        "FR-5",
+        "FR-7"
+      ]
+    },
+    {
+      "id": "US-2",
+      "role": "مسؤول الحجوزات",
+      "goal": "أعرض قائمة الحجوزات وأبحث فيها",
+      "benefit": "أجد السجل الذي أحتاجه",
+      "entity": "Booking",
+      "operation": "read",
+      "requirement_ids": [
+        "FR-2"
+      ]
+    },
+    {
+      "id": "US-3",
+      "role": "مسؤول الحجوزات",
+      "goal": "أعدّل سجلاً موجوداً في الحجوزات",
+      "benefit": "تبقى البيانات صحيحة ومحدّثة",
+      "entity": "Booking",
+      "operation": "update",
+      "requirement_ids": [
+        "FR-3",
+        "FR-5",
+        "FR-6"
+      ]
+    },
+    {
+      "id": "US-4",
+      "role": "مسؤول الحجوزات",
+      "goal": "أحذف سجلاً لم أعد أحتاجه من الحجوزات",
+      "benefit": "تحتوي القائمة على السجلات المهمة فقط",
+      "entity": "Booking",
+      "operation": "delete",
+      "requirement_ids": [
+        "FR-4"
+      ]
+    }
+  ],
+  "acceptance_criteria": [
+    {
+      "id": "AC-1",
+      "story_id": "US-1",
+      "category": "create",
+      "given": "قائمة الحجوزات مفتوحة وتحتوي على N سجل",
+      "when": "يُدخل المستخدم اسم العميل = \"سارة أحمد\"، التاريخ = \"تاريخ بعد 3 أيام من اليوم\"، الوقت = \"10:30\"، حالة الحجز = \"مؤكد\" ويضغط \"حفظ\"",
+      "then": "يظهر سجل جديد باسم \"سارة أحمد\" في قائمة الحجوزات ويصبح عدد السجلات N + 1"
+    },
+    {
+      "id": "AC-2",
+      "story_id": "US-1",
+      "category": "validation",
+      "given": "نموذج الإضافة في الحجوزات مفتوح",
+      "when": "يترك المستخدم جميع الحقول فارغة ويضغط \"حفظ\"",
+      "then": "لا يُحفظ أي سجل وتظهر رسالة خطأ بجانب كل حقل إلزامي: اسم العميل، التاريخ، الوقت"
+    },
+    {
+      "id": "AC-3",
+      "story_id": "US-1",
+      "category": "validation",
+      "given": "نموذج الإضافة في الحجوزات مفتوح وجميع الحقول الأخرى صحيحة",
+      "when": "يُدخل المستخدم القيمة \"س\" المكونة من حرف واحد في \"اسم العميل\" ويضغط \"حفظ\"",
+      "then": "لا يُحفظ السجل وتظهر رسالة خطأ بجانب \"اسم العميل\""
+    },
+    {
+      "id": "AC-4",
+      "story_id": "US-1",
+      "category": "validation",
+      "given": "نموذج الإضافة في الحجوزات مفتوح وجميع الحقول الأخرى صحيحة",
+      "when": "يُدخل المستخدم تاريخ الأمس في \"التاريخ\" ويضغط \"حفظ\"",
+      "then": "لا يُحفظ السجل وتظهر رسالة خطأ بجانب \"التاريخ\""
+    },
+    {
+      "id": "AC-5",
+      "story_id": "US-1",
+      "category": "validation",
+      "given": "نموذج الإضافة في الحجوزات مفتوح وجميع الحقول الأخرى صحيحة",
+      "when": "يُدخل المستخدم نصاً من 501 حرف في \"ملاحظات\" ويضغط \"حفظ\"",
+      "then": "لا يُحفظ السجل وتظهر رسالة خطأ بجانب \"ملاحظات\""
+    },
+    {
+      "id": "AC-6",
+      "story_id": "US-1",
+      "category": "persistence",
+      "given": "تمت إضافة سجل باسم \"سارة أحمد\" إلى الحجوزات",
+      "when": "يعيد المستخدم تحميل الصفحة",
+      "then": "يبقى \"سارة أحمد\" ظاهراً في قائمة الحجوزات بنفس القيم"
+    },
+    {
+      "id": "AC-7",
+      "story_id": "US-2",
+      "category": "read",
+      "given": "تمت إضافة 3 سجلات إلى الحجوزات",
+      "when": "يفتح المستخدم قائمة الحجوزات",
+      "then": "تظهر 3 صفوف بالضبط، يحتوي كل منها على الأعمدة اسم العميل، التاريخ، الوقت، حالة الحجز"
+    },
+    {
+      "id": "AC-8",
+      "story_id": "US-2",
+      "category": "read",
+      "given": "لا توجد سجلات في الحجوزات",
+      "when": "يفتح المستخدم قائمة الحجوزات",
+      "then": "تظهر رسالة تفيد بعدم وجود سجلات بدلاً من القائمة"
+    },
+    {
+      "id": "AC-9",
+      "story_id": "US-2",
+      "category": "read",
+      "given": "يوجد في الحجوزات سجلان باسم \"سارة أحمد\" و\"سجل آخر\"",
+      "when": "يكتب المستخدم \"سارة أحمد\" في مربع البحث",
+      "then": "يظهر السجل \"سارة أحمد\" فقط في القائمة"
+    },
+    {
+      "id": "AC-10",
+      "story_id": "US-3",
+      "category": "update",
+      "given": "يوجد في الحجوزات سجل باسم \"سارة أحمد\"",
+      "when": "يغير المستخدم اسم العميل إلى \"سارة أحمد (معدل)\" ويضغط \"حفظ\" ثم يعيد تحميل الصفحة",
+      "then": "تعرض القائمة \"سارة أحمد (معدل)\" ولا تعرض \"سارة أحمد\""
+    },
+    {
+      "id": "AC-11",
+      "story_id": "US-3",
+      "category": "validation",
+      "given": "يوجد في الحجوزات سجل باسم \"سارة أحمد\"",
+      "when": "يمسح المستخدم اسم العميل في نموذج التعديل ويضغط \"حفظ\"",
+      "then": "لا يُحفظ التعديل وتظهر رسالة خطأ ويبقى \"سارة أحمد\" في القائمة"
+    },
+    {
+      "id": "AC-12",
+      "story_id": "US-3",
+      "category": "update",
+      "given": "يوجد حجز باسم \"سارة أحمد\" حالته \"مؤكد\"",
+      "when": "يغير المستخدم حالته إلى \"ملغى\" ويضغط \"حفظ\"",
+      "then": "يبقى حجز \"سارة أحمد\" ظاهراً في القائمة وحالته \"ملغى\""
+    },
+    {
+      "id": "AC-13",
+      "story_id": "US-4",
+      "category": "delete",
+      "given": "يوجد في الحجوزات سجل باسم \"سارة أحمد\" وتعرض القائمة N سجل",
+      "when": "يضغط المستخدم \"حذف\" عليه ثم يؤكد",
+      "then": "يُزال \"سارة أحمد\" من القائمة ويصبح العدد N - 1 ويبقى غير موجود بعد إعادة تحميل الصفحة"
+    },
+    {
+      "id": "AC-14",
+      "story_id": "US-4",
+      "category": "delete",
+      "given": "يوجد في الحجوزات سجل باسم \"سارة أحمد\"",
+      "when": "يضغط المستخدم \"حذف\" عليه ثم يلغي التأكيد",
+      "then": "يبقى \"سارة أحمد\" ظاهراً في القائمة"
+    }
+  ],
+  "clarification_questions": [
+    {
+      "id": "Q-1",
+      "question": "عند إلغاء الحجز، هل يُحذف نهائياً أم يبقى بحالة \"ملغى\"؟",
+      "reason": "كلمة \"إلغاء\" قد تعني تغيير الحالة أو الحذف.",
+      "blocking": false,
+      "options": [],
+      "suggested_default": "يبقى بحالة \"ملغى\" مع إمكانية الحذف."
+    },
+    {
+      "id": "Q-2",
+      "question": "هل يمكن أن يكون لحجزين نفس التاريخ والوقت؟",
+      "reason": "يحدد هل يجب أن يمنع التطبيق تعارض الحجوزات.",
+      "blocking": false,
+      "options": [],
+      "suggested_default": "مسموح؛ النسخة الأولى لا تتحقق من تعارض الحجوزات."
+    },
+    {
+      "id": "Q-3",
+      "question": "هل تحتاج أيضاً إلى رقم جوال العميل أو نوع الشيء المحجوز (طاولة، غرفة، خدمة)؟",
+      "reason": "لم يُذكر إلا اسم العميل والتاريخ والوقت والحالة.",
+      "blocking": false,
+      "options": [],
+      "suggested_default": "اسم العميل والتاريخ والوقت والحالة وملاحظات اختيارية فقط."
+    }
+  ],
+  "assumptions": [
+    "يستخدم التطبيق شخص واحد في متصفح واحد؛ وتُحفظ البيانات في localStorage.",
+    "يحصل كل سجل تلقائياً على حقول النظام id و created_at و updated_at.",
+    "يحفظ الحجز تاريخ ووقت البداية فقط دون مدة.",
+    "الإلغاء يُبقي الحجز بحالة \"ملغى\"، أما الحذف فيزيله نهائياً."
+  ],
+  "out_of_scope": []
+}

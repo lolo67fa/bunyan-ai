@@ -1,0 +1,49 @@
+{
+  "schema_version": "0.1.0-proposal",
+  "status": "rejected_out_of_scope",
+  "language": "ar",
+  "source_idea": "أريد تطبيق جوال للآيفون يدعم الدفع الإلكتروني بالبطاقات ودردشة مباشرة بين العملاء.",
+  "app": {
+    "name": "تطبيق CRUD بدون اسم",
+    "description": "التطبيق المطلوب خارج نطاق النسخة الأولى (CRUD): أريد تطبيق جوال للآيفون يدعم الدفع الإلكتروني بالبطاقات ودردشة مباشرة بين العملاء.",
+    "target_users": []
+  },
+  "entities": [],
+  "functional_requirements": [],
+  "user_stories": [],
+  "acceptance_criteria": [],
+  "clarification_questions": [
+    {
+      "id": "Q-1",
+      "question": "هل يفيدك بدلاً من ذلك تطبيق ويب بسيط لتسجيل البيانات المرتبطة وإدارتها (إضافة، عرض، تعديل، حذف)؟",
+      "reason": "الميزات المطلوبة خارج نطاق النسخة الأولى (CRUD).",
+      "blocking": false,
+      "options": [],
+      "suggested_default": null
+    }
+  ],
+  "assumptions": [],
+  "out_of_scope": [
+    {
+      "feature": "معالجة المدفوعات الإلكترونية ('الدفع الإلكتروني')",
+      "category": "payments",
+      "reason": "معالجة المدفوعات خارج نطاق النسخة الأولى (CRUD).",
+      "action": "replaced_with_crud_alternative",
+      "alternative": "تسجيل حالة الدفع (مدفوع / غير مدفوع) كحقل عادي."
+    },
+    {
+      "feature": "تطبيق جوال أصلي ('تطبيق جوال')",
+      "category": "native_mobile",
+      "reason": "يتم توليد تطبيقات ويب تعمل في المتصفح فقط.",
+      "action": "replaced_with_crud_alternative",
+      "alternative": "تطبيق ويب متجاوب يعمل أيضاً في متصفح الجوال."
+    },
+    {
+      "feature": "التعاون بين عدة مستخدمين في الوقت الفعلي ('دردشة')",
+      "category": "realtime_collaboration",
+      "reason": "تُحفظ البيانات في localStorage فهي خاصة بمتصفح واحد.",
+      "action": "excluded",
+      "alternative": null
+    }
+  ]
+}

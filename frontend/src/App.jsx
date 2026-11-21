@@ -1,24 +1,29 @@
-import { MODE } from './api/client.js';
-import { goHome, useHashRoute } from './hooks/useHashRoute.js';
-import IdeaPage from './pages/IdeaPage.jsx';
+import { ToastProvider } from './components/ui.jsx';
+import { useHashRoute } from './hooks/useHashRoute.js';
+import AppShell from './layouts/AppShell.jsx';
+import LandingPage from './pages/LandingPage.jsx';
+import NewProjectPage from './pages/NewProjectPage.jsx';
 import ProjectPage from './pages/ProjectPage.jsx';
+import ProjectsPage from './pages/ProjectsPage.jsx';
+import SettingsPage from './pages/SettingsPage.jsx';
 
 export default function App() {
   const route = useHashRoute();
+  if (route.page === 'home') {
+    return (
+      <ToastProvider>
+        <LandingPage />
+      </ToastProvider>
+    );
+  }
+  let page;
+  if (route.page === 'project') page = <ProjectPage key={route.id} id={route.id} tab={route.tab} />;
+  else if (route.page === 'projects') page = <ProjectsPage />;
+  else if (route.page === 'settings' || route.page === 'help') page = <SettingsPage key={route.page} focusHelp={route.page === 'help'} />;
+  else page = <NewProjectPage />;
   return (
-    <>
-      <header className="topbar">
-        <button className="brand" onClick={goHome} aria-label="الصفحة الرئيسية">
-          بُنيان <span className="accent ltr">AI</span>
-        </button>
-        {MODE === 'mock' && (
-          <span className="mock-badge" title="بيانات تجريبية — الباك إند غير مربوط">
-            Mock
-          </span>
-        )}
-      </header>
-      <main>{route.page === 'project' ? <ProjectPage key={route.id} id={route.id} /> : <IdeaPage />}</main>
-      <footer className="foot muted small">نادي طويق · جامعة الملك سعود — مسار الذكاء الاصطناعي</footer>
-    </>
+    <ToastProvider>
+      <AppShell route={route}>{page}</AppShell>
+    </ToastProvider>
   );
 }

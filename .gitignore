@@ -62,3 +62,8 @@ temp/
 .DS_Store
 Thumbs.db
 desktop.ini
+/backend/data/
+
+
+# Deployment settings with real users or keys
+deploy.env

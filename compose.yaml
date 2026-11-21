@@ -1,0 +1,36 @@
+# BUNYAN AI: local reproduction of the club deployment.
+#   cp deploy.env.example deploy.env      # then add users (see DEPLOY.md)
+#   docker compose up --build
+#   open http://localhost:8080
+services:
+  bunyan:
+    build: .
+    image: bunyan-ai:club-demo
+    env_file:
+      - path: deploy.env
+        required: false
+    environment:
+      PORT: "8000"
+    ports:
+      - "127.0.0.1:8080:8000"   # this machine only; put HTTPS in front for anything else
+    volumes:
+      - bunyan-data:/data
+    restart: unless-stopped
+    # The entrypoint only needs these to fix the volume owner and drop to the bunyan user.
+    cap_drop: [ALL]
+    cap_add: [CHOWN, SETUID, SETGID, FOWNER, DAC_OVERRIDE]
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 2g
+    cpus: 2
+    pids_limit: 512
+    shm_size: 512m              # Chromium needs more than the 64 MB default
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+volumes:
+  bunyan-data:

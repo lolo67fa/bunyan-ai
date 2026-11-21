@@ -10,8 +10,8 @@ Definitions of the five BUNYAN AI agents (role, goal, prompt, task, and expected
 | QA Tester | Sara | `test_report.json` |
 | Project Manager | Jood | `project_plan.md`, `risks.md` |
 
-Agent outputs must conform to the schemas in [`../schemas/`](../schemas/). Integration into the workflow is handled in [`../orchestrator/`](../orchestrator/) by Alanoud.
+The agents are run in order by [`../orchestrator/`](../orchestrator/), which documents the pipeline, its states and its errors.
 
 ## Status
 
-Not yet implemented.
+All five agents are implemented and connected on the integration branch. The Architect, the Developer and the Project Manager are deterministic (no LLM). The Business Analyst can use an LLM but the API currently runs it in mock mode. The QA ↔ Developer repair loop is not implemented.

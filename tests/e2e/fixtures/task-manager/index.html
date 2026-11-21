@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>QA harness fixture</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!--
+    QA HARNESS FIXTURE (owner: Sara). Hand-written so the fixed test suite can be
+    developed before the Developer agent exists. It is NOT the team's CRUD
+    template and passing tests here does NOT prove a generated app works.
+    It renders the app described by architecture.json (contract 0.3.0) and follows
+    its data-testid rules (§5). See app.js for simulated defects (?bug=...).
+  -->
+  <p class="fixture-note">QA harness fixture — not a generated app</p>
+  <h1 id="app-title"></h1>
+
+  <section id="screen-list" data-testid="screen-list" hidden>
+    <button type="button" data-testid="btn-add" id="btn-add"></button>
+    <table data-testid="records-table">
+      <thead><tr id="head-row"></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <p data-testid="empty-state" id="empty-state"></p>
+  </section>
+
+  <section id="screen-form" data-testid="screen-form" hidden>
+    <form id="form" novalidate></form>
+    <button type="button" data-testid="btn-save" id="btn-save"></button>
+    <button type="button" data-testid="btn-cancel" id="btn-cancel"></button>
+  </section>
+
+  <div data-testid="toast" id="toast" role="status" hidden></div>
+  <script src="app.js"></script>
+</body>
+</html>

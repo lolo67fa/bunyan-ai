@@ -807,7 +807,12 @@ def _build_entity(b: _Builder, domain: DomainSpec, e: EntitySpec) -> None:
     required = [f for f in e.fields if f.required]
     values = SEP[lang].join(f"{f.label[lang]} = \"{f.sample[lang]}\"" for f in required)
     b.ac(s, "create", AC["create"][lang], **base, values=values)
-    b.ac(s, "validation", AC["required"][lang], **{**base, "fields": SEP[lang].join(f.label[lang] for f in required)})
+    # Only fields the user can really leave empty: a field with a default (or a checkbox) is
+    # pre-filled, so "leave all fields empty" cannot trigger its required-field error.
+    emptiable = [f for f in required if f.default is None and f.default_index is None and f.type != "boolean"]
+    if emptiable:
+        b.ac(s, "validation", AC["required"][lang],
+             **{**base, "fields": SEP[lang].join(f.label[lang] for f in emptiable)})
     for f in e.fields:
         if f.invalid:
             b.ac(s, "validation", AC["invalid"][lang], **{**base, "invalid": f.invalid[lang], "field": f.label[lang]})
