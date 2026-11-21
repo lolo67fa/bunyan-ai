@@ -335,7 +335,7 @@
       "category": "validation",
       "given": "the create Appointment form is open",
       "when": "the user leaves all fields empty and clicks \"Save\"",
-      "then": "no Appointment is saved and an error message is shown next to each required field: Client name, Client phone, Service, Date, Time, Duration (minutes), Status"
+      "then": "no Appointment is saved and an error message is shown next to each required field: Client name, Client phone, Service, Date, Time"
     },
     {
       "id": "AC-3",

@@ -118,10 +118,10 @@ Errors: FastAPI default `{ "detail": "..." }` (string or validation list). Propo
 |---|---|---|
 | F1 | Approve returns the full `Project`; approve accepts `{ approved: false, feedback }`; `POST /answers`; the proposed fields; `422` for invalid ideas | Alanoud |
 | F4 | Preview origin: the generated app uses `localStorage`, so the iframe needs `allow-same-origin`; it must be served from a different origin than the frontend | Alanoud |
-| F6 | `architecture.json` sample | Naifah |
+| F6 | `architecture.json` sample | Naifah · **done** (real samples from PR #4 in `src/mocks/architecture/`) |
 | F7 | Confirm the QA → `metrics` mapping above, and that the orchestrator computes `run_time_seconds` | Sara, Alanoud |
 | F8 | Generated file names (`index.html`, `style.css`, `app.js`) and a sample app for the preview | Yara |
-| F9 | Bunyan visual identity: colours, fonts, wireframes (current styles are temporary) | Naifah |
+| F9 | Bunyan visual identity: colours, fonts, wireframes | Naifah, Jood · **done** (`frontend/brand/`, Riyadh theme PR #14) |
 
 The frontend must never contain LLM API keys; all model calls go through the backend.
 
