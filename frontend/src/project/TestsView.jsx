@@ -1,7 +1,7 @@
 import { Notice, StatusText } from '../components/ui.jsx';
 import { checkLabels, formatDuration } from '../lib/labels.js';
 import { MSG } from '../lib/messages.js';
-import { QA_NOTES, repairCount } from '../lib/qa.js';
+import { QA_NOTES, repairCount, repairSteps } from '../lib/qa.js';
 import { useArtifact } from './useArtifact.js';
 
 const RESULT = {
@@ -24,6 +24,7 @@ export default function TestsView({ project }) {
   // A repair is mentioned only when the backend made one; the report's attempt alone is not enough.
   const repairs = Math.min(repairCount(project), attempt);
   const status = project.qa?.status ?? (s.all_passed ? 'passed' : 'failed');
+  const history = repairSteps(project);
   const final = {
     passed: ['ناجح', 'done'],
     failed: ['لم ينجح', 'failed'],
@@ -66,6 +67,20 @@ export default function TestsView({ project }) {
         <p className="muted small" data-testid="qa-skipped">
           {s.skipped} فحوصات لم تنطبق على هذا التطبيق، ولا تُحسب ناجحة.
         </p>
+      )}
+
+      {history && history.rows.length > 1 && (
+        <div data-testid="repair-history">
+          <h3 className="small strong" style={{ margin: '0 0 var(--bn-s2)' }}>سجل الإصلاح</h3>
+          <ol className="small" style={{ margin: 0, paddingInlineStart: 'var(--bn-s5)', display: 'grid', gap: 'var(--bn-s1)' }}>
+            {history.rows.map((row) => (
+              <li key={row.key} data-testid={`repair-step-${row.key}`}>
+                <span className="strong">{row.label}:</span> <StatusText tone={row.tone}>{row.result}</StatusText>
+              </li>
+            ))}
+          </ol>
+          {history.stopped && <p className="muted small" data-testid="repair-stopped" style={{ marginBottom: 0 }}>{history.stopped}</p>}
+        </div>
       )}
 
       <div className="table-wrap">
