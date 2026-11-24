@@ -59,7 +59,7 @@ export default function DeliveryView({ project }) {
           <Icon name={qa.ok ? 'check' : 'alert'} size={20} />
         </span>
         <h1 className="title" data-testid="delivery-title">{qa.ok ? 'تطبيقك جاهز!' : 'تطبيقك جاهز مع ملاحظات'}</h1>
-        <p className="lead">
+        <p className="lead" dir="auto">
           {req?.app?.name}: {req?.app?.description}
         </p>
         {qa.note && (

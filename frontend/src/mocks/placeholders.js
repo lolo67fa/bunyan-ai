@@ -14,7 +14,7 @@ export function mockArchitecture(req) {
     language: req.language,
     direction: req.language === 'ar' ? 'rtl' : 'ltr',
     screens: req.entities.map((e) => ({ entity: e.name, views: ['list', 'form'] })),
-    storage: req.entities.map((e) => ({ entity: e.name, key: `bunyan.${e.name.toLowerCase()}` })),
+    storage: req.entities.map((e) => ({ entity: e.name, key: `bunyan_${e.name.toLowerCase()}` })),
   };
 }
 
@@ -221,20 +221,20 @@ export function mockPreviewHtml(req, arch) {
   return `<!doctype html><html lang="${lang}" dir="${dir}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(req.app.name)}</title>
 <style>
-*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;background:#f6f8fb;color:#1f2937;font-size:14px}
+*{box-sizing:border-box}body{margin:0;font-family:"IBM Plex Sans Arabic",system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;background:#F8F7FC;color:#17123A;font-size:14px}
 .wrap{max-width:980px;margin:0 auto;padding:24px 16px}
-header{display:flex;justify-content:space-between;align-items:baseline;border-bottom:3px solid #2563eb;padding-bottom:10px;margin-bottom:16px}
-h1{font-size:20px;margin:0}.count{color:#6b7280;font-size:12px}
-form{display:flex;flex-wrap:wrap;gap:10px;align-items:end;background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:12px;margin-bottom:12px}
+header{display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid #5B3FA8;padding-bottom:10px;margin-bottom:16px}
+h1{font-size:20px;margin:0}.count{color:#676184;font-size:12px}
+form{display:flex;flex-wrap:wrap;gap:10px;align-items:end;background:#fff;border:1px solid #E6E2F2;border-radius:10px;padding:12px;margin-bottom:12px}
 label{display:grid;gap:4px;font-size:12px;font-weight:600;flex:1 1 140px}
-input{padding:8px;border:1px solid #d1d5db;border-radius:6px;font:inherit}
-.add{background:#2563eb;color:#fff;border:0;border-radius:6px;padding:9px 18px;font:inherit;font-weight:600}
-.search{width:100%;padding:8px;border:1px solid #d1d5db;border-radius:6px;margin-bottom:12px;font:inherit}
-.tw{overflow-x:auto;background:#fff;border:1px solid #e5e7eb;border-radius:8px}
-table{width:100%;border-collapse:collapse}th,td{padding:10px;text-align:start;border-bottom:1px solid #f0f1f3;white-space:nowrap}
-th{font-size:12px;color:#6b7280;background:#f9fafb}.act{display:flex;gap:6px}
-.act button{border:1px solid #d1d5db;background:#fff;border-radius:6px;padding:4px 10px;font:inherit;font-size:12px}
-.act .del{color:#b42318;border-color:#f3c9c3}.note{color:#6b7280;font-size:12px;margin-top:10px}
+input{padding:8px;border:1px solid #E6E2F2;border-radius:6px;font:inherit}
+.add{background:#5B3FA8;color:#fff;border:0;border-radius:6px;padding:9px 18px;font:inherit;font-weight:600}
+.search{width:100%;padding:8px;border:1px solid #E6E2F2;border-radius:6px;margin-bottom:12px;font:inherit}
+.tw{overflow-x:auto;background:#fff;border:1px solid #E6E2F2;border-radius:8px}
+table{width:100%;border-collapse:collapse}th,td{padding:10px;text-align:start;border-bottom:1px solid #E6E2F2;white-space:nowrap}
+th{font-size:12px;color:#676184;background:#F8F7FC}.act{display:flex;gap:6px}
+.act button{border:1px solid #E6E2F2;background:#fff;border-radius:6px;padding:4px 10px;font:inherit;font-size:12px}
+.act .del{color:#b42318;border-color:#f3c9c3}.note{color:#676184;font-size:12px;margin-top:10px}
 </style></head><body><div class="wrap">
 <header><h1>${esc(req.app.name)}</h1><span class="count">${t.count}</span></header>
 <form>${inputs}<button class="add">${t.add}</button></form>
